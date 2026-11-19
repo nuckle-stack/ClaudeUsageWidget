@@ -1,0 +1,111 @@
+<Window x:Class="ClaudeUsageWidget.SessionsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:ClaudeUsageWidget"
+        Title="Claude Sessions"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" ResizeMode="NoResize" SizeToContent="Height" Width="350"
+        Topmost="True" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        FontFamily="Segoe UI" FontSize="11">
+    <Border CornerRadius="8" Background="#F815151A" BorderBrush="#30FFFFFF" BorderThickness="1" Padding="12,10">
+        <StackPanel>
+            <StackPanel x:Name="ForecastBox" Margin="0,0,0,10" Visibility="Collapsed">
+                <TextBlock Text="Ritmo de uso" Foreground="#99FFFFFF" FontWeight="SemiBold" Margin="0,0,0,3"/>
+                <TextBlock x:Name="Forecast" TextWrapping="Wrap" LineHeight="15"/>
+            </StackPanel>
+            <StackPanel x:Name="HistoryBox" Margin="0,0,0,12">
+                <Grid>
+                    <TextBlock Text="Janela de 5h · últimas 24 h" Foreground="#99FFFFFF" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="Read5" Foreground="#B3FFFFFF" FontSize="10" HorizontalAlignment="Right"
+                               VerticalAlignment="Bottom"/>
+                </Grid>
+                <local:Sparkline x:Name="Chart5" Height="38" Margin="0,5,0,0"/>
+                <Grid Margin="0,10,0,0">
+                    <TextBlock Text="Semana · últimos 7 dias" Foreground="#99FFFFFF" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="Read7" Foreground="#B3FFFFFF" FontSize="10" HorizontalAlignment="Right"
+                               VerticalAlignment="Bottom"/>
+                </Grid>
+                <local:Sparkline x:Name="Chart7" Height="38" Margin="0,5,0,0"/>
+            </StackPanel>
+            <TextBlock x:Name="Header" Foreground="#99FFFFFF" FontWeight="SemiBold" Margin="0,0,0,4"/>
+            <TextBlock x:Name="Empty" Text="Nenhuma sessão do Claude Code ativa." Foreground="#99FFFFFF"
+                       Margin="0,6,0,2" Visibility="Collapsed"/>
+            <ItemsControl x:Name="List">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="#18FFFFFF" BorderThickness="0,1,0,0" Padding="0,7,0,6"
+                                Cursor="Hand" MouseLeftButtonUp="OnRowClick" Opacity="{Binding Opacity}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#14FFFFFF"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="54"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <!-- Hide / show again; only while the pointer is on the row. -->
+                                <TextBlock Grid.Column="3" Text="{Binding Action}" ToolTip="{Binding ActionTip}"
+                                           FontFamily="Segoe MDL2 Assets" FontSize="10" Padding="6,2,2,4"
+                                           VerticalAlignment="Top" Background="Transparent"
+                                           MouseLeftButtonUp="OnRowAction">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="#80FFFFFF"/>
+                                            <Setter Property="Visibility" Value="Hidden"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Action}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Foreground" Value="#F2FFFFFF"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <Border Background="{Binding KindBack}" CornerRadius="3" Padding="0,1" Margin="0,1,8,0"
+                                        VerticalAlignment="Top">
+                                    <TextBlock Text="{Binding Kind}" Foreground="{Binding KindFore}" FontSize="10"
+                                               FontWeight="SemiBold" TextAlignment="Center"/>
+                                </Border>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding Name}" Foreground="#F2FFFFFF" FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/>
+                                    <TextBlock Text="{Binding Cwd}" Foreground="#80FFFFFF" FontSize="10"
+                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Cwd}"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                        <Ellipse Width="6" Height="6" Fill="{Binding StatusBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Status}" Foreground="#B3FFFFFF" FontSize="10" Margin="5,0,0,0"
+                                                   MaxWidth="215" TextTrimming="CharacterEllipsis" ToolTip="{Binding Status}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Margin="10,0,0,0">
+                                    <TextBlock Text="{Binding Quality}" Foreground="{Binding QualityBrush}"
+                                               FontWeight="SemiBold" TextAlignment="Right" ToolTip="Qualidade do contexto (token-optimizer)"/>
+                                    <TextBlock Text="{Binding Fill}" Foreground="#80FFFFFF" FontSize="10" TextAlignment="Right"
+                                               ToolTip="Contexto ocupado"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock x:Name="SdkToggle" Foreground="#80FFFFFF" FontSize="10" Margin="0,6,0,0" Cursor="Hand"
+                       MouseLeftButtonUp="OnToggleSdk" Visibility="Collapsed"/>
+            <TextBlock x:Name="HiddenToggle" Foreground="#80FFFFFF" FontSize="10" Margin="0,4,0,0" Cursor="Hand"
+                       MouseLeftButtonUp="OnToggleHidden" Visibility="Collapsed"/>
+        </StackPanel>
+    </Border>
+</Window>

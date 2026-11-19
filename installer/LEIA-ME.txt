@@ -1,0 +1,79 @@
+CLAUDE USAGE WIDGET
+===================
+
+Um pequeno widget para o canto do ecrã que mostra:
+  - os limites de utilização do Claude (janela de 5 horas e semanal);
+  - as sessões do Claude Code abertas (CLI, app Desktop, VS Code);
+  - avisos quando uma sessão termina, precisa de ti ou está a gastar depressa.
+
+
+REQUISITOS
+----------
+  - Windows de 64 bits.
+  - Claude Code já instalado e em uso (CLI, app Desktop ou extensão do VS Code).
+  - Não é preciso ser administrador.
+
+
+INSTALAR
+--------
+1. Extrai este zip para uma pasta qualquer (por exemplo, Transferências).
+
+2. Abre o PowerShell nessa pasta (na pasta onde está este ficheiro: clica com
+   o botão direito num espaço vazio > "Abrir no Terminal") e corre:
+
+     powershell -ExecutionPolicy Bypass -File .\install.ps1 -AutoStart
+
+   (-AutoStart faz o widget arrancar com o Windows. Podes tirá-lo.)
+
+3. No fim, vê a linha "Limites:".
+     - "Limites: OK"  -> está pronto.
+     - Aviso amarelo  -> as sessões e os avisos funcionam, mas os limites (5h / 7d)
+                         não. Para os ter: instala o Claude Code CLI, corre
+                         'claude' num terminal e faz /login com a tua conta.
+                         Depois: botão direito no widget > "Atualizar agora".
+
+4. Reinicia as sessões do Claude Code que já estavam abertas, para passarem a
+   enviar dados ao widget.
+
+O widget é copiado para %LOCALAPPDATA%\Programs\ClaudeUsageWidget, por isso
+podes apagar esta pasta depois de instalar.
+
+
+USAR
+----
+  - O widget aparece no canto inferior direito. Arrasta-o para onde quiseres.
+  - Clique: abre a lista de sessões. Clicar numa sessão traz a janela dela para
+    a frente. O "x" (ao passar o rato) esconde-a até voltar a ter atividade.
+  - Botão direito: Definições (auto-hello, avisos, cores), Não incomodar, Sair.
+  - Também há um ícone na área de notificação, junto ao relógio.
+
+  Qualidade do contexto (opcional): se tiveres o plugin "token-optimizer" do
+  Claude Code, cada sessão mostra também a qualidade e a ocupação do contexto
+  (ex. "Q 72 B" e "45% ctx"), e o widget avisa quando o contexto degrada ou está
+  quase cheio. Sem o plugin essas colunas ficam vazias; tudo o resto funciona.
+  O widget não depende de nenhuma skill nem servidor MCP.
+
+
+O QUE O INSTALADOR ALTERA
+-------------------------
+  - Em %USERPROFILE%\.claude\settings.json: o "statusLine" e um hook
+    "Notification". Antes guarda uma cópia (settings.json.bak-usage-widget-...).
+    Se já tinhas um statusline, ele continua a funcionar: o do widget chama-o.
+  - Cria a pasta %USERPROFILE%\.claude\usage-widget (dados e registo do widget).
+  - Com -AutoStart: uma entrada de arranque em HKCU\...\Run.
+
+
+DESINSTALAR
+-----------
+     powershell -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall
+
+  Remove o widget e repõe o statusline que tinhas antes.
+
+
+PROBLEMAS
+---------
+  - O comando dá erro de política de execução ou o antivírus apaga o .exe:
+    o PC tem regras da empresa contra programas não assinados. Fala com o IT.
+  - O widget mostra "--": ainda não há leituras. Usa o Claude Code uma vez ou
+    faz botão direito > "Atualizar agora".
+  - Registo de erros: %USERPROFILE%\.claude\usage-widget\widget.log

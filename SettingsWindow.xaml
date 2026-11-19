@@ -1,0 +1,112 @@
+<Window x:Class="ClaudeUsageWidget.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Claude Usage — Definições" SizeToContent="WidthAndHeight" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" Topmost="True" FontFamily="Segoe UI" FontSize="12">
+    <StackPanel Margin="18" Width="320">
+        <TextBlock Text="Auto-hello" FontWeight="SemiBold" FontSize="13"/>
+        <CheckBox x:Name="HelloEnabled" Margin="0,8,0,0"
+                  Content="Enviar mensagem quando a janela de 5h renovar"/>
+        <StackPanel x:Name="HelloOptions" Margin="0,10,0,0">
+            <RadioButton x:Name="ModeReset" GroupName="HelloMode" Content="Logo que a janela renove"/>
+            <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
+                <TextBlock Text="Só entre as" VerticalAlignment="Center"/>
+                <TextBox x:Name="From" Width="50" Margin="8,0" TextAlignment="Center"/>
+                <TextBlock Text="e as" VerticalAlignment="Center"/>
+                <TextBox x:Name="To" Width="50" Margin="8,0" TextAlignment="Center"/>
+            </StackPanel>
+            <RadioButton x:Name="ModeSchedule" GroupName="HelloMode" Margin="0,10,0,0" Content="A horas marcadas"/>
+            <TextBox x:Name="Schedule" Margin="20,6,0,0"/>
+            <TextBlock Margin="20,4,0,0" Foreground="#666" TextWrapping="Wrap"
+                       Text="Horas de início das janelas, por exemplo 07:00, 12:00, 17:00. As janelas começam à hora certa, por isso usa horas certas."/>
+            <CheckBox x:Name="WeekdaysOnly" Margin="0,10,0,0" Content="Só em dias úteis"/>
+            <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="Mensagem" VerticalAlignment="Center"/>
+                <TextBox x:Name="Message" Grid.Column="1" Margin="0,0,0,6"/>
+                <TextBlock Grid.Row="1" Text="Modelo" VerticalAlignment="Center"/>
+                <TextBox x:Name="Model" Grid.Row="1" Grid.Column="1"/>
+            </Grid>
+        </StackPanel>
+
+        <Separator Margin="0,16,0,12"/>
+        <TextBlock Text="Avisos" FontWeight="SemiBold" FontSize="13"/>
+        <CheckBox x:Name="AlertsEnabled" Margin="0,8,0,0"
+                  Content="Avisar quando uma sessão termina ou precisa de mim"/>
+        <CheckBox x:Name="AlertsSound" Margin="0,8,0,0" Content="Com som"/>
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+            <TextBlock Text="Só tarefas com mais de" VerticalAlignment="Center"/>
+            <TextBox x:Name="MinTask" Width="40" Margin="8,0" TextAlignment="Center"/>
+            <TextBlock Text="s" VerticalAlignment="Center"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock Text="Relembrar a cada" VerticalAlignment="Center"/>
+            <TextBox x:Name="Remind" Width="40" Margin="8,0" TextAlignment="Center"/>
+            <TextBlock Text="min (0 = só uma vez)" VerticalAlignment="Center"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <TextBlock Text="Avisar de uso aos" VerticalAlignment="Center"/>
+            <TextBox x:Name="Levels" Width="70" Margin="8,0" TextAlignment="Center"/>
+            <TextBlock Text="% (vazio = nunca)" VerticalAlignment="Center"/>
+        </StackPanel>
+        <CheckBox x:Name="ForecastAlert" Margin="0,8,0,0"
+                  Content="Avisar se o ritmo esgotar o limite antes do reset"/>
+        <CheckBox x:Name="ContextEnabled" Margin="0,12,0,0"
+                  Content="Avisar quando o contexto de uma sessão degrada"/>
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock Text="Qualidade abaixo de" VerticalAlignment="Center"/>
+            <TextBox x:Name="QualityBelow" Width="36" Margin="8,0" TextAlignment="Center"/>
+            <TextBlock Text="ou contexto acima de" VerticalAlignment="Center"/>
+            <TextBox x:Name="FillAbove" Width="36" Margin="8,0" TextAlignment="Center"/>
+            <TextBlock Text="%" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <Separator Margin="0,16,0,12"/>
+        <TextBlock Text="Atualização" FontWeight="SemiBold" FontSize="13"/>
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock Text="Atualizar a cada" VerticalAlignment="Center"/>
+            <TextBox x:Name="RefreshMinutes" Width="40" Margin="8,0" TextAlignment="Center"/>
+            <TextBlock Text="min (0 = nunca)" VerticalAlignment="Center"/>
+        </StackPanel>
+        <TextBlock Margin="0,6,0,0" Foreground="#666" TextWrapping="Wrap"
+                   Text="Só enquanto o Claude estiver a ser usado. Cada atualização envia uma mensagem curta no modelo acima."/>
+
+        <Separator Margin="0,16,0,12"/>
+        <TextBlock Text="Janela" FontWeight="SemiBold" FontSize="13"/>
+        <CheckBox x:Name="OnTop" Margin="0,8,0,0" Content="Sempre por cima"/>
+        <CheckBox x:Name="AutoStart" Margin="0,8,0,0" Content="Iniciar com o Windows"/>
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+            <TextBlock Text="Esconder sessões do Desktop paradas há" VerticalAlignment="Center"/>
+            <TextBox x:Name="HideIdle" Width="40" Margin="8,0" TextAlignment="Center"/>
+            <TextBlock Text="min (0 = nunca)" VerticalAlignment="Center"/>
+        </StackPanel>
+        <Grid Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="80"/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Opacidade" VerticalAlignment="Center"/>
+            <Slider x:Name="OpacitySlider" Grid.Column="1" Minimum="0.3" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="True"/>
+        </Grid>
+        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+            <TextBlock Text="Amarelo aos" VerticalAlignment="Center"/>
+            <TextBox x:Name="WarnAt" Width="40" Margin="8,0" TextAlignment="Center"/>
+            <TextBlock Text="%, vermelho aos" VerticalAlignment="Center"/>
+            <TextBox x:Name="CritAt" Width="40" Margin="8,0" TextAlignment="Center"/>
+            <TextBlock Text="%" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <TextBlock x:Name="Error" Foreground="#C0392B" Margin="0,12,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Guardar" Width="80" Padding="0,4" IsDefault="True" Click="OnSave"/>
+            <Button Content="Cancelar" Width="80" Padding="0,4" Margin="8,0,0,0" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
