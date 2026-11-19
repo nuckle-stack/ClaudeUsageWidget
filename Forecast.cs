@@ -78,7 +78,9 @@ public class UsageHistory
 
         // Pace from the recent past when there is enough of it, else from the
         // whole window, else assume steady use since the window opened.
-        var (window, lookback, minSpan) = fiveHour ? (5 * 3600, 3600, 600) : (7 * 86400, 86400, 3600);
+        // The weekly pace needs at least a full day: an hour of heavy use,
+        // carried on through nights and days off, "runs out" in a couple of days.
+        var (window, lookback, minSpan) = fiveHour ? (5 * 3600, 3600, 600) : (7 * 86400, 2 * 86400, 86400);
         var same = _file.Samples.Where(s => Math.Abs(Pick(s, fiveHour).ResetsAt - resetsAt) <= 60).ToList();
         var from = same.FirstOrDefault(s => s.T >= last.T - lookback && last.T - s.T >= minSpan)
                    ?? same.FirstOrDefault(s => last.T - s.T >= minSpan);
