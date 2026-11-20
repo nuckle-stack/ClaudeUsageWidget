@@ -55,7 +55,7 @@ public class UsageLedgerTests
 
     /// <summary>An assistant line as Claude Code writes it; Opus 5.5 by default.</summary>
     private static string Line(string msgId, string session, string cwd, long at, long output = 1_000_000,
-        string model = "claude-opus-5-5", long write1h = 0, long write = 0, string block = "text")
+        string model = "claude-opus-5-5", long write1h = 0, long write = 0, string block = "text", string entrypoint = "cli")
     {
         var line = new Dictionary<string, object>
         {
@@ -85,6 +85,7 @@ public class UsageLedgerTests
             ["timestamp"] = DateTimeOffset.FromUnixTimeSeconds(at).ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
             ["cwd"] = cwd,
             ["sessionId"] = session,
+            ["entrypoint"] = entrypoint,
         };
         return System.Text.Json.JsonSerializer.Serialize(line) + "\n";
     }
@@ -219,6 +220,20 @@ public class UsageLedgerTests
         var sessions = Read().Summarize(Now - 3600, Now + 1).Projects.Single().Sessions;
         Assert.Contains(sessions, s => s.Title == "Estado do projeto");
         Assert.Contains(sessions, s => s.Title == "sessão 01234567");
+    }
+
+    [Fact]
+    public void Recent_sessions_latest_first_in_the_folder_they_started_in()
+    {
+        File.WriteAllText(Transcript("a", "s1"),
+            Line("m1", "s1", @"D:\Work\Alpha", Now - 7200) + Line("m2", "s1", @"D:\Work\Alpha\src", Now - 3600));
+        File.WriteAllText(Transcript("b", "s2"), Line("m3", "s2", @"D:\Work\Beta", Now - 600, entrypoint: "claude-vscode"));
+        File.WriteAllText(Transcript("c", "s3"), Line("m4", "s3", @"D:\Work\Old", Now - 9 * 86400 + 3600));
+
+        var recent = Read().Recent(Now - 7 * 86400);
+        Assert.Equal(["s2", "s1"], recent.Select(r => r.SessionId));
+        Assert.Equal(new RecentSession("s1", @"D:\Work\Alpha", "cli", Now - 3600), recent[1]);
+        Assert.Equal("claude-vscode", recent[0].Entrypoint);
     }
 
     [Fact]

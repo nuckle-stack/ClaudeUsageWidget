@@ -120,7 +120,7 @@ public static class SessionScanner
             .ToList();
     }
 
-    private static string KindOf(string entrypoint)
+    internal static string KindOf(string entrypoint)
     {
         if (entrypoint.Contains("desktop", StringComparison.OrdinalIgnoreCase)) return "Desktop";
         if (entrypoint.StartsWith("sdk", StringComparison.OrdinalIgnoreCase)) return "SDK";

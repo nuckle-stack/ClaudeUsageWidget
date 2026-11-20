@@ -114,6 +114,83 @@ public partial class SessionsWindow : Window
         SdkToggle.Text = _cfg.ShowSdkSessions
             ? "Esconder sessões de plugins"
             : $"Mostrar {sdk} de plugins / automação";
+
+        RenderRecent(all);
+    }
+
+    // ---- recent sessions -----------------------------------------------------
+
+    /// <summary>One closed session that can be resumed.</summary>
+    public record RecentRow(string SessionId, string Cwd, string Name, string Detail, string Tip);
+
+    private const int RecentShown = 6;
+    /// <summary>Open or closed, for as long as the widget runs.</summary>
+    private static bool _showRecent;
+    /// <summary>Titles of closed sessions: their transcripts no longer change, so each is read once.</summary>
+    private static readonly Dictionary<string, string> RecentTitles = new();
+    private Task? _titling;
+
+    /// <summary>
+    /// The terminal and VS Code sessions of the last 7 days that are not open
+    /// now, latest first. The desktop app keeps its own history.
+    /// </summary>
+    private void RenderRecent(List<SessionInfo> live)
+    {
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var open = live.Select(s => s.SessionId).ToHashSet();
+        var recent = UsageLedger.Shared.Recent(now - 7 * 86400)
+            .Where(r => !open.Contains(r.SessionId) && SessionScanner.KindOf(r.Entrypoint) is "CLI" or "VS Code")
+            .Take(RecentShown)
+            .ToList();
+
+        RecentBox.Visibility = recent.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        RecentToggle.Text = _showRecent ? "esconder" : $"mostrar {recent.Count}";
+        RecentList.Visibility = _showRecent ? Visibility.Visible : Visibility.Collapsed;
+        if (!_showRecent || recent.Count == 0) return;
+
+        // The titles come from the transcripts, read once each, off the UI thread.
+        List<RecentSession> untitled;
+        lock (RecentTitles) untitled = recent.Where(r => !RecentTitles.ContainsKey(r.SessionId)).ToList();
+        if (untitled.Count > 0 && _titling is not { IsCompleted: false })
+        {
+            var claudeDir = System.IO.Path.GetDirectoryName(Paths.Dir)!;
+            _titling = Task.Run(() =>
+            {
+                foreach (var r in untitled)
+                {
+                    var title = Transcripts.Title(claudeDir, r.SessionId, r.Cwd, "", "derived");
+                    lock (RecentTitles) RecentTitles[r.SessionId] = title;
+                }
+            }).ContinueWith(_ => Dispatcher.BeginInvoke(Refresh));
+        }
+
+        RecentList.ItemsSource = recent.Select(r =>
+        {
+            string? title;
+            lock (RecentTitles) RecentTitles.TryGetValue(r.SessionId, out title);
+            var name = title is { Length: > 0 } ? title : $"sessão {r.SessionId[..Math.Min(8, r.SessionId.Length)]}";
+            var project = System.IO.Path.GetFileName(r.Cwd.TrimEnd('\\', '/'));
+            var ago = SessionStatus.Age(DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeSeconds(r.LastAt));
+            var kind = SessionScanner.KindOf(r.Entrypoint) == "VS Code" ? " · VS Code" : "";
+            return new RecentRow(r.SessionId, r.Cwd, name, $"{project} · há {ago}{kind}",
+                $"Retomar num terminal novo, em {ShortPath(r.Cwd)}\n(claude --resume {r.SessionId})");
+        }).ToList();
+    }
+
+    private void OnToggleRecent(object sender, MouseButtonEventArgs e)
+    {
+        _showRecent = !_showRecent;
+        Refresh();
+    }
+
+    private void OnRecentClick(object sender, MouseButtonEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not RecentRow row) return;
+        var (ok, detail) = Resume.Open(row.SessionId, row.Cwd, _cfg.ClaudePath);
+        var id = row.SessionId[..Math.Min(8, row.SessionId.Length)];
+        Log.Write(ok ? $"Retomar: sessão {id} em {detail}." : $"Retomar: sessão {id} falhou: {detail}");
+        // On success the terminal takes the focus, which closes this popup.
+        if (!ok) Header.Text = detail;
     }
 
     // ---- usage by project ----------------------------------------------------

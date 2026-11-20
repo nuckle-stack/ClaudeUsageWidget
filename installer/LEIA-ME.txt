@@ -49,6 +49,10 @@ USAR
   - Avisos: "terminou" avisa uma vez; "precisa de ti" relembra até 3 vezes.
     Se já estás a olhar para a janela da sessão, o aviso conta como visto.
     Clicar no aviso (enquanto está no ecrã) leva-te à sessão.
+  - "Recentes", no fim da lista de sessões: as sessões do terminal e do VS
+    Code dos últimos 7 dias que já fechaste. Um clique abre um separador novo
+    do Windows Terminal (ou uma consola) na pasta dela, com a conversa
+    retomada (claude --resume).
   - Cada sessão diz o que está a fazer agora ("a editar Forecast.cs", "a correr
     dotnet test"). Quando pede autorização, o aviso e a lista dizem para quê
     ("precisa de ti para correr git push").

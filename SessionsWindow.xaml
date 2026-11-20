@@ -144,6 +144,38 @@
                        MouseLeftButtonUp="OnToggleSdk" Visibility="Collapsed"/>
             <TextBlock x:Name="HiddenToggle" Foreground="#80FFFFFF" FontSize="10" Margin="0,4,0,0" Cursor="Hand"
                        MouseLeftButtonUp="OnToggleHidden" Visibility="Collapsed"/>
+            <!-- Sessions of the last days that are closed now: a click resumes one in a terminal. -->
+            <StackPanel x:Name="RecentBox" Margin="0,12,0,0" Visibility="Collapsed">
+                <Grid Background="Transparent" Cursor="Hand" MouseLeftButtonUp="OnToggleRecent">
+                    <TextBlock Text="Recentes · para retomar" Foreground="#99FFFFFF" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="RecentToggle" Foreground="#80FFFFFF" FontSize="10" HorizontalAlignment="Right"
+                               VerticalAlignment="Bottom"/>
+                </Grid>
+                <ItemsControl x:Name="RecentList" Margin="0,4,0,0" Visibility="Collapsed">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="#18FFFFFF" BorderThickness="0,1,0,0" Padding="0,5,0,5" Cursor="Hand"
+                                    MouseLeftButtonUp="OnRecentClick" ToolTip="{Binding Tip}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#14FFFFFF"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" Foreground="#E6FFFFFF" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Detail}" Foreground="#80FFFFFF" FontSize="10"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
         </StackPanel>
     </Border>
 </Window>

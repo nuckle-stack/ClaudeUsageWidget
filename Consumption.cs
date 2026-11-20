@@ -60,6 +60,9 @@ public static class Pricing
     }
 }
 
+/// <summary>A session that answered lately: where it started, where it ran, and its last answer (unix seconds).</summary>
+public record RecentSession(string SessionId, string Cwd, string Entrypoint, long LastAt);
+
 /// <summary>How much one session used in a period, as API-equivalent dollars.</summary>
 public record SessionUse(string SessionId, string Title, double Cost);
 
@@ -94,7 +97,7 @@ public class UsageLedger
 
     private const long KeepSeconds = 8 * 86400;
 
-    private record Request(string SessionId, string Cwd, long At, double Cost);
+    private record Request(string SessionId, string Cwd, long At, double Cost, string Entrypoint);
 
     private readonly string _claudeDir;
     private readonly object _gate = new();
@@ -184,6 +187,26 @@ public class UsageLedger
             foreach (var old in _requests.Where(r => r.Value.At < now - KeepSeconds).Select(r => r.Key).ToList())
                 _requests.Remove(old);
         }
+    }
+
+    /// <summary>
+    /// The sessions that got an answer since from (unix seconds), the latest
+    /// first: each with the folder it started in (where it resumes), where it
+    /// ran (its entrypoint: cli, claude-vscode...) and its last answer.
+    /// </summary>
+    public List<RecentSession> Recent(long from)
+    {
+        List<Request> all;
+        lock (_gate) all = _requests.Values.ToList();
+        return all.GroupBy(r => r.SessionId)
+            .Select(g =>
+            {
+                var last = g.MaxBy(r => r.At)!;
+                return new RecentSession(g.Key, g.MinBy(r => r.At)!.Cwd, last.Entrypoint, last.At);
+            })
+            .Where(s => s.LastAt >= from)
+            .OrderByDescending(s => s.LastAt)
+            .ToList();
     }
 
     /// <summary>
@@ -335,7 +358,7 @@ public class UsageLedger
             var cost = Pricing.Cost(Str(m, "model"), Num(u, "input_tokens"), Num(u, "output_tokens"),
                 Num(u, "cache_read_input_tokens"), write5m, write1h);
             if (cost <= 0) return null;   // e.g. "<synthetic>" error lines
-            return (id, new Request(sessionId, Str(e, "cwd"), at.ToUnixTimeSeconds(), cost));
+            return (id, new Request(sessionId, Str(e, "cwd"), at.ToUnixTimeSeconds(), cost, Str(e, "entrypoint")));
         }
         catch (JsonException) { return null; }
     }
