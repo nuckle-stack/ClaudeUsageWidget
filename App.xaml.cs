@@ -44,8 +44,7 @@ public partial class App : Application
             return;
         }
 
-        _single = new Mutex(true, "ClaudeUsageWidget.SingleInstance", out var isNew);
-        if (!isNew)
+        if (!TakeSingleInstance())
         {
             Shutdown();
             return;
@@ -63,6 +62,57 @@ public partial class App : Application
         if (e.Args.Contains("--sessions")) Dispatcher.BeginInvoke(main.ToggleSessions);
         // "--week": start with the weekly summary open.
         else if (e.Args.Contains("--week")) Dispatcher.BeginInvoke(() => main.OpenWeek(showLast: false));
+    }
+
+    // ---- one widget at a time ----------------------------------------------------------
+
+    public const string ShowSignalName = "ClaudeUsageWidget.Show";
+
+    /// <summary>
+    /// Only one widget runs. When another holds the lock: if this is the
+    /// installed copy and the other runs from somewhere else (an unpacked zip,
+    /// an old copy), the installed one takes over; if it is the same widget,
+    /// it is asked to show itself (opened from the Start menu while running).
+    /// Either way the log says what happened: a widget that closes without a
+    /// word looks like one that never started.
+    /// </summary>
+    private bool TakeSingleInstance()
+    {
+        _single = new Mutex(true, "ClaudeUsageWidget.SingleInstance", out var isNew);
+        if (isNew) return true;
+
+        var me = Environment.ProcessPath ?? "";
+        var others = Installer.OtherCopies();
+        var strays = others.Where(o => !string.Equals(o.Path, me, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (Installer.IsInstalledCopy(me) && strays.Count > 0)
+        {
+            foreach (var (pid, path, _) in strays)
+            {
+                Log.Write($"Outra cópia do widget aberta (pid {pid}, {path}): fechada, fica a instalada.");
+                try
+                {
+                    using var p = System.Diagnostics.Process.GetProcessById(pid);
+                    p.Kill(entireProcessTree: true);
+                    p.WaitForExit(5000);
+                }
+                catch { }
+            }
+            try
+            {
+                if (_single.WaitOne(TimeSpan.FromSeconds(5))) return true;
+            }
+            // Its owner was killed: the lock is ours.
+            catch (AbandonedMutexException) { return true; }
+        }
+
+        Log.Write($"O widget já está aberto ({string.Join(", ", others.Select(o => $"pid {o.Pid}, {o.Path}"))}): a mostrá-lo.");
+        try
+        {
+            using var show = EventWaitHandle.OpenExisting(ShowSignalName);
+            show.Set();
+        }
+        catch { }
+        return false;
     }
 
     // ---- installing ------------------------------------------------------------------

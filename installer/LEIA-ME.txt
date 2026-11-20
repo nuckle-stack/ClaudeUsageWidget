@@ -49,6 +49,7 @@ USAR
     a frente. O "x" (ao passar o rato) esconde-a até voltar a ter atividade.
   - Botão direito: Definições (auto-hello, avisos, cores), Não incomodar, Sair.
   - Também há um ícone na área de notificação, junto ao relógio.
+  - Depois de "Sair", volta a abri-lo no menu Iniciar: "Claude Usage Widget".
   - Avisos: "terminou" avisa uma vez; "precisa de ti" relembra até 3 vezes.
     Se já estás a olhar para a janela da sessão, o aviso conta como visto.
     Clicar no aviso (enquanto está no ecrã) leva-te à sessão.
@@ -133,6 +134,10 @@ PROBLEMAS
   - O Windows não deixa abrir o .exe (sem "Executar mesmo assim") ou o
     antivírus apaga-o: o PC tem regras da empresa contra programas não
     assinados. Fala com o IT.
+  - O widget não aparece: abre "Claude Usage Widget" no menu Iniciar (se já
+    estiver aberto, mostra-se), ou botão direito no ícone junto ao relógio >
+    "Repor posição do widget". O ícone pode estar escondido no "^" e, no
+    primeiro arranque de uma versão nova, demorar uns segundos a aparecer.
   - O widget mostra "--": ainda não há leituras. Usa o Claude Code uma vez ou
     faz botão direito > "Atualizar agora".
   - Registo de erros: %USERPROFILE%\.claude\usage-widget\widget.log

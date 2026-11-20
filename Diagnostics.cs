@@ -23,7 +23,7 @@ public static class Diagnostics
     public record Live(
         Config Config, Limits Statusline, Limits Ping, bool HelloRunning,
         (int Failures, long NextAttemptAt) Backoff, string Hotkey, List<SessionInfo> Sessions, int Waiting,
-        string Updates = "", string Format = "");
+        string Updates = "", string Format = "", string Window = "");
 
     public static readonly string ReportPath = Path.Combine(Paths.Dir, "diagnostico.txt");
 
@@ -128,6 +128,15 @@ public static class Diagnostics
         Line($"Abertas: {live.Sessions.Count}" + (live.Sessions.Count > 0 ? $" ({string.Join(", ", kinds)})" : "") + (live.Waiting >= 0 ? $" · à tua espera: {live.Waiting}" : ""));
         var sessionsDir = Path.Combine(claudeDir, "sessions");
         Line($"Ficheiros em sessions\\: {(Directory.Exists(sessionsDir) ? Directory.EnumerateFiles(sessionsDir, "*.json").Count() : 0)}");
+
+        Section("Janela e processos");
+        Line("Janela: " + (live.Window.Length > 0 ? live.Window : "desconhecida (relatório feito fora do widget; o \"Copiar diagnóstico\" do widget mostra-a)"));
+        // Another copy holds the single-instance lock; a new widget would close itself.
+        var copies = Installer.OtherCopies();
+        Line(copies.Count == 0
+            ? "Outros processos do widget a correr: nenhum."
+            : "Outros processos do widget a correr: " + string.Join("; ", copies.Select(c =>
+                $"pid {c.Pid}, {c.Path}{(c.Started == default ? "" : $", desde {c.Started:dd/MM HH:mm}")}")));
 
         Section($"widget.log (últimas {LogLines} linhas)");
         foreach (var line in LogTail(Paths.Log, LogLines)) Line(LogLine(line));

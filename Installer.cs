@@ -114,12 +114,18 @@ public static class Installer
         foreach (var old in new[] { "feed.ps1", "notify.ps1" })
             try { File.Delete(Path.Combine(Paths.Dir, old)); } catch { }
 
-        // 3. Start with Windows.
+        // 3. Start with Windows, and from the Start menu.
         if (o.AutoStart is { } on)
         {
             SetAutoStart(on ? exe : null);
             step(on ? "Arranque com o Windows: ligado." : "Arranque com o Windows: desligado.");
         }
+        try
+        {
+            CreateShortcut(exe);
+            step("Atalho no menu Iniciar: \"Claude Usage Widget\".");
+        }
+        catch (Exception ex) { Log.Write($"Atalho no menu Iniciar falhou: {ex.Message}"); }
 
         // 4. Can the widget read the limits? One short message through any
         //    Claude Code it finds; before the launch, so the widget starts with it.
@@ -181,6 +187,11 @@ public static class Installer
         {
             SetAutoStart(null);
             step("Arranque com o Windows: desligado.");
+        }
+        if (ShortcutTarget() is { } target && SamePath(target, Path.Combine(dir, ExeName)))
+        {
+            try { File.Delete(Shortcut); } catch { }
+            step("Atalho no menu Iniciar: removido.");
         }
         step("O widget e os dados dele são apagados ao fechar esta janela.");
     }
@@ -399,20 +410,83 @@ public static class Installer
         try { File.Delete(file + ":Zone.Identifier"); } catch { }
     }
 
-    /// <summary>Stops the widget running from that exe (not this process), so it can be replaced.</summary>
+    /// <summary>
+    /// Stops every other copy of the widget, from any folder: one left running
+    /// from an unpacked zip, or a hello stuck from an old install, keeps the
+    /// single-instance lock, and the new widget would close itself on seeing it.
+    /// </summary>
     private static void StopWidget(string exe)
     {
-        foreach (var p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(ExeName)))
+        foreach (var other in OtherCopies())
         {
             try
             {
-                if (p.Id == Environment.ProcessId || !SamePath(p.MainModule?.FileName ?? "", exe)) continue;
-                p.Kill();
+                using var p = Process.GetProcessById(other.Pid);
+                p.Kill(entireProcessTree: true);
                 p.WaitForExit(5000);
+                Log.Write($"Instalação: fechada outra cópia do widget (pid {other.Pid}, {other.Path}).");
             }
             catch { }
-            finally { p.Dispose(); }
         }
+    }
+
+    /// <summary>The other ClaudeUsageWidget processes running: their id, exe and start.</summary>
+    public static List<(int Pid, string Path, DateTime Started)> OtherCopies()
+    {
+        var copies = new List<(int, string, DateTime)>();
+        foreach (var p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(ExeName)))
+        {
+            using (p)
+            {
+                if (p.Id == Environment.ProcessId) continue;
+                string path;
+                DateTime started;
+                try { path = p.MainModule?.FileName ?? "?"; } catch { path = "?"; }
+                try { started = p.StartTime; } catch { started = default; }
+                copies.Add((p.Id, path, started));
+            }
+        }
+        return copies;
+    }
+
+    /// <summary>Whether this exe is the one an install put in place (not a package, not a build folder).</summary>
+    public static bool IsInstalledCopy(string exe) =>
+        File.Exists(Path.Combine(Path.GetDirectoryName(exe) ?? "", Marker));
+
+    // ---- Start menu ------------------------------------------------------------------
+
+    private static string Shortcut =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Claude Usage Widget.lnk");
+
+    /// <summary>The exe the Start menu entry opens, or null when there is none.</summary>
+    private static string? ShortcutTarget()
+    {
+        if (!File.Exists(Shortcut)) return null;
+        try
+        {
+            var type = Type.GetTypeFromProgID("WScript.Shell");
+            if (type is null) return null;
+            dynamic shell = Activator.CreateInstance(type)!;
+            try { return (string)shell.CreateShortcut(Shortcut).TargetPath; }
+            finally { System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell); }
+        }
+        catch { return null; }
+    }
+
+    /// <summary>A Start menu entry, to open the widget again after "Sair".</summary>
+    private static void CreateShortcut(string exe)
+    {
+        var type = Type.GetTypeFromProgID("WScript.Shell") ?? throw new InvalidOperationException("WScript.Shell indisponível.");
+        dynamic shell = Activator.CreateInstance(type)!;
+        try
+        {
+            var link = shell.CreateShortcut(Shortcut);
+            link.TargetPath = exe;
+            link.WorkingDirectory = Path.GetDirectoryName(exe);
+            link.Description = "Limites, sessões e avisos do Claude Code";
+            link.Save();
+        }
+        finally { System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell); }
     }
 
     private static void SetAutoStart(string? exe)

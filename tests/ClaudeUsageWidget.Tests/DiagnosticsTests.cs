@@ -167,7 +167,7 @@ public class DiagnosticsTests
         var text = await Diagnostics.BuildAsync(new Diagnostics.Live(
             new Config(), statusline, ping, false, (2, now + 300), "Ctrl+Alt+C (ativo)", sessions, 1));
 
-        foreach (var section in new[] { "== Widget ==", "== Claude Code ==", "== settings.json ==", "== Leituras ==", "== Definições ==", "== Sessões ==", "== widget.log" })
+        foreach (var section in new[] { "== Widget ==", "== Claude Code ==", "== settings.json ==", "== Leituras ==", "== Definições ==", "== Sessões ==", "== Janela e processos ==", "== widget.log" })
             Assert.Contains(section, text);
         Assert.Contains("Statusline (limits.json): há 2 min", text);
         Assert.Contains("5h 22%", text);

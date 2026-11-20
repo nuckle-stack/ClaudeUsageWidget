@@ -76,6 +76,61 @@ public partial class MainWindow : Window
         };
         _updateTimer.Start();
         Updater.CleanUp();
+
+        // How long it took to appear: on a slow or busy PC the first start of
+        // a new version (unpacked, scanned by the antivirus) can take a while.
+        ContentRendered += (_, _) =>
+        {
+            var took = DateTime.Now - System.Diagnostics.Process.GetCurrentProcess().StartTime;
+            Log.Write($"Arranque: widget visível {took.TotalSeconds:0.0} s depois de o processo começar.");
+        };
+
+        // Opened again while running (Start menu, a double click): show this one.
+        var show = new EventWaitHandle(false, EventResetMode.AutoReset, App.ShowSignalName);
+        new Thread(() => { while (show.WaitOne()) Dispatcher.BeginInvoke(ShowHere); }) { IsBackground = true }.Start();
+    }
+
+    // ---- where it is -------------------------------------------------------------
+
+    /// <summary>Visible, on a screen, in front: when asked from outside.</summary>
+    private void ShowHere()
+    {
+        if (!IsVisible) Show();
+        if (!OnAScreen()) ResetPosition();
+        Topmost = false;
+        Topmost = true;
+        Log.Write("Widget mostrado a pedido.");
+    }
+
+    /// <summary>Back to the default spot, beside the notifications, and shown.</summary>
+    private void ResetPosition()
+    {
+        _cfg.Left = null;
+        _cfg.Top = null;
+        Json.Save(Paths.Config, _cfg);
+        if (!IsVisible) Show();
+        PlaceWindow();
+        Log.Write($"Posição reposta: {Left:0},{Top:0}.");
+    }
+
+    /// <summary>Whether any part of the window is on a monitor (a saved spot can be on one no longer there).</summary>
+    private bool OnAScreen()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        return hwnd == IntPtr.Zero || MonitorFromWindow(hwnd, 0) != IntPtr.Zero;
+    }
+
+    [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    /// <summary>For the diagnostics: where the window is and what the screens are.</summary>
+    private string WindowStatus()
+    {
+        var screens = string.Join("; ", Forms.Screen.AllScreens.Select(s =>
+            $"{s.Bounds.Width}x{s.Bounds.Height} em {s.Bounds.X},{s.Bounds.Y}{(s.Primary ? " (principal)" : "")}"));
+        var area = SystemParameters.WorkArea;
+        return $"{(IsVisible ? "visível" : "escondida")}{(OnAScreen() ? "" : ", FORA DOS ECRÃS")} em {Left:0},{Top:0} " +
+               $"({ActualWidth:0}x{ActualHeight:0}); área de trabalho {area.Width:0}x{area.Height:0} em {area.Left:0},{area.Top:0}; " +
+               $"ecrãs: {screens}";
     }
 
     // ---- updates -----------------------------------------------------------
@@ -812,7 +867,7 @@ public partial class MainWindow : Window
         {
             var sessions = await Task.Run(SessionScanner.Scan);
             var text = await Diagnostics.BuildAsync(new Diagnostics.Live(
-                _cfg, _limits, _hello.Ping, _hello.Running, _hello.Backoff, _hotkeyState, sessions, _alerts.Waiting().Count, UpdateStatus(), _format.Status()));
+                _cfg, _limits, _hello.Ping, _hello.Running, _hello.Backoff, _hotkeyState, sessions, _alerts.Waiting().Count, UpdateStatus(), _format.Status(), WindowStatus()));
             Directory.CreateDirectory(Paths.Dir);
             File.WriteAllText(Diagnostics.ReportPath, text);
 
@@ -858,6 +913,7 @@ public partial class MainWindow : Window
     {
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Mostrar / esconder", null, (_, _) => ToggleVisible());
+        menu.Items.Add("Repor posição do widget", null, (_, _) => ResetPosition());
         menu.Items.Add("Resumo da semana", null, (_, _) => OpenWeek(showLast: false));
         var goTo = new Forms.ToolStripMenuItem("Ir para a sessão à tua espera", null, (_, _) => GoToWaiting());
         menu.Items.Add(goTo);
