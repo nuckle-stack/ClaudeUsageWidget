@@ -151,30 +151,37 @@ public class Updater
         }
         if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         ZipFile.ExtractToDirectory(zip, dir);
-        var installer = Directory.EnumerateFiles(dir, "install.ps1", SearchOption.AllDirectories).FirstOrDefault()
-            ?? throw new InvalidDataException("O zip não tem o install.ps1.");
-        return Path.GetDirectoryName(installer)!;
+        var exe = Directory.EnumerateFiles(dir, Installer.ExeName, SearchOption.AllDirectories).FirstOrDefault()
+            ?? throw new InvalidDataException($"O zip não tem o {Installer.ExeName}.");
+        return Path.GetDirectoryName(exe)!;
     }
 
     /// <summary>
-    /// Starts the new version's installer, hidden, with its output in
-    /// update.log. It outlives this process, which should exit right after so
-    /// the exe can be replaced.
+    /// Starts the new version's installer, hidden. It outlives this process,
+    /// which should exit right after so the exe can be replaced. A package
+    /// with the feed installs itself (its steps in install.log); an older one
+    /// only has install.ps1 (its output in update.log).
     /// </summary>
     public static void RunInstaller(string folder, bool autoStart)
     {
-        var script = Path.Combine(folder, "install.ps1");
-        var log = Path.Combine(Paths.Dir, "update.log");
-        // No hello test: an update should not spend a message.
-        var command = $"& '{Quote(script)}' -NoCheck{(autoStart ? " -AutoStart" : "")} *>&1 | Out-File -LiteralPath '{Quote(log)}' -Encoding utf8";
-        var psi = new ProcessStartInfo("powershell.exe")
+        ProcessStartInfo psi;
+        var exe = Path.Combine(folder, Installer.ExeName);
+        if (File.Exists(Path.Combine(folder, Installer.FeedName)))
         {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            WorkingDirectory = folder,
-        };
-        foreach (var arg in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", command })
-            psi.ArgumentList.Add(arg);
+            psi = new ProcessStartInfo(exe) { UseShellExecute = false, WorkingDirectory = folder };
+            // No hello test: an update should not spend a message.
+            foreach (var arg in new[] { "--install", "--silent", "--no-check", autoStart ? "--autostart" : "--no-autostart" })
+                psi.ArgumentList.Add(arg);
+        }
+        else
+        {
+            var script = Path.Combine(folder, "install.ps1");
+            var log = Path.Combine(Paths.Dir, "update.log");
+            var command = $"& '{Quote(script)}' -NoCheck{(autoStart ? " -AutoStart" : "")} *>&1 | Out-File -LiteralPath '{Quote(log)}' -Encoding utf8";
+            psi = new ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = folder };
+            foreach (var arg in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command", command })
+                psi.ArgumentList.Add(arg);
+        }
         Process.Start(psi);
 
         static string Quote(string path) => path.Replace("'", "''");

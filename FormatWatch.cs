@@ -186,6 +186,7 @@ public class FormatWatch
 
     internal static FeedKind FeedOfCommand(string command)
     {
+        if (command.Contains(Installer.FeedName, StringComparison.OrdinalIgnoreCase)) return FeedKind.Widget;
         if (command.Contains("usage-widget", StringComparison.OrdinalIgnoreCase) &&
             command.Contains("feed.ps1", StringComparison.OrdinalIgnoreCase)) return FeedKind.Widget;
         var script = Regex.Match(command, "\"([^\"]+\\.ps1)\"|(\\S+\\.ps1)");

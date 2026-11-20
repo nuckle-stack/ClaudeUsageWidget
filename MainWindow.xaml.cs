@@ -758,10 +758,26 @@ public partial class MainWindow : Window
     private void OnHide(object sender, RoutedEventArgs e) => Hide();
     private void OnExit(object sender, RoutedEventArgs e) => Exit();
 
+    /// <summary>From the settings: Claude Code's settings put back, then the files go once this process has exited.</summary>
+    private void UninstallAndExit()
+    {
+        var dir = Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? Installer.DefaultDir;
+        var steps = new List<string>();
+        try { Installer.Uninstall(dir, steps.Add); }
+        catch (Exception ex) { steps.Add($"Não deu para remover tudo: {ex.Message}"); }
+        MessageBox.Show(string.Join("\n", steps), "Claude Usage Widget", MessageBoxButton.OK, MessageBoxImage.Information);
+        Installer.RemoveFilesAfterExit(dir);
+        Exit();
+    }
+
     private void OpenSettings()
     {
         var dlg = new SettingsWindow(_cfg);
-        if (dlg.ShowDialog() != true) return;
+        if (dlg.ShowDialog() != true)
+        {
+            if (dlg.UninstallRequested) UninstallAndExit();
+            return;
+        }
         _cfg = dlg.Result;
         Json.Save(Paths.Config, _cfg);
         ApplyConfig();

@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace ClaudeUsageWidget.Tests;
 
 /// <summary>The report a colleague pastes when something does not work.</summary>
@@ -65,22 +67,49 @@ public class DiagnosticsTests
     [Fact]
     public void Settings_with_the_widget_installed()
     {
-        var dir = Settings("""
+        Directory.CreateDirectory(_dir);
+        var feed = Path.Combine(_dir, "Ana Silva", Installer.FeedName);   // a folder with a space
+        Directory.CreateDirectory(Path.GetDirectoryName(feed)!);
+        File.WriteAllText(feed, "");
+        var quoted = JsonSerializer.Serialize($"\"{feed}\"");
+        var dir = Settings($$"""
             {
-              "statusLine": { "type": "command", "command": "powershell -File \"C:\\x\\.claude\\usage-widget\\feed.ps1\"" },
-              "hooks": { "Notification": [ { "hooks": [ { "type": "command", "command": "powershell -File \"C:\\x\\.claude\\usage-widget\\notify.ps1\"" } ] } ] },
+              "statusLine": { "type": "command", "command": {{quoted[..^1]}} statusline" },
+              "hooks": { "Notification": [ { "hooks": [ { "type": "command", "command": {{quoted[..^1]}} notify" } ] } ] },
               "env": { "ANTHROPIC_BASE_URL": "https://secret.example/gateway", "MY_TOKEN": "s3cr3t" }
             }
             """);
-        File.WriteAllText(Path.Combine(dir, "usage-widget", "feed.ps1"), "");
 
         var lines = Diagnostics.SettingsLines(dir);
-        Assert.Contains("Statusline: o feed do widget.", lines);
+        Assert.Contains("Statusline: o do widget (ClaudeUsageFeed.exe).", lines);
         Assert.Contains("Hook Notification do widget: instalado", lines);
+        Assert.Contains($"ClaudeUsageFeed.exe: existe ({feed})", lines);
         Assert.Contains("env (só os nomes): ANTHROPIC_BASE_URL, MY_TOKEN", lines);
-        Assert.Contains("Ficheiros do widget: feed.ps1 existe, notify.ps1 em falta", lines);
         // Values never leave the machine.
         Assert.DoesNotContain(lines, l => l.Contains("secret") || l.Contains("s3cr3t"));
+    }
+
+    [Fact]
+    public void Settings_still_on_the_PowerShell_scripts()
+    {
+        var lines = Diagnostics.SettingsLines(Settings("""
+            {
+              "statusLine": { "type": "command", "command": "powershell -File \"C:\\x\\.claude\\usage-widget\\feed.ps1\"" },
+              "hooks": { "Notification": [ { "hooks": [ { "type": "command", "command": "powershell -File \"C:\\x\\.claude\\usage-widget\\notify.ps1\"" } ] } ] }
+            }
+            """));
+        Assert.Contains("Statusline: o do widget, ainda pelo PowerShell (feed.ps1).", lines);
+        Assert.Contains("Hook Notification do widget: instalado, ainda pelo PowerShell (notify.ps1)", lines);
+        Assert.DoesNotContain(lines, l => l.StartsWith("ClaudeUsageFeed.exe"));
+    }
+
+    [Theory]
+    [InlineData("\"C:\\Users\\Ana Silva\\AppData\\Local\\Programs\\ClaudeUsageWidget\\ClaudeUsageFeed.exe\" statusline", @"C:\Users\Ana Silva\AppData\Local\Programs\ClaudeUsageWidget\ClaudeUsageFeed.exe")]
+    [InlineData(@"C:\Tools\ClaudeUsageFeed.exe notify", @"C:\Tools\ClaudeUsageFeed.exe")]
+    [InlineData("npx ccstatusline", null)]
+    public void The_feed_a_command_runs(string command, string? expected)
+    {
+        Assert.Equal(expected, Diagnostics.FeedPath(command));
     }
 
     [Fact]

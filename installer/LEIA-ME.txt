@@ -18,25 +18,27 @@ INSTALAR
 --------
 1. Extrai este zip para uma pasta qualquer (por exemplo, Transferências).
 
-2. Abre o PowerShell nessa pasta (na pasta onde está este ficheiro: clica com
-   o botão direito num espaço vazio > "Abrir no Terminal") e corre:
+2. Faz duplo clique em ClaudeUsageWidget.exe e carrega em "Instalar".
 
-     powershell -ExecutionPolicy Bypass -File .\install.ps1 -AutoStart
+   Se o Windows mostrar "O Windows protegeu o computador": "Mais informações" >
+   "Executar mesmo assim". Aparece porque o widget não é assinado; só acontece
+   desta vez.
 
-   (-AutoStart faz o widget arrancar com o Windows. Podes tirá-lo.)
-
-3. No fim, vê a linha "Limites:".
-     - "Limites: OK"  -> está pronto.
-     - Aviso amarelo  -> as sessões e os avisos funcionam, mas os limites (5h / 7d)
-                         não. Para os ter: instala o Claude Code CLI, corre
-                         'claude' num terminal e faz /login com a tua conta.
-                         Depois: botão direito no widget > "Atualizar agora".
+3. No fim, a janela diz como correu.
+     - "Instalado."                    -> está pronto.
+     - "Instalado, mas sem os limites" -> as sessões e os avisos funcionam, mas os
+                                          limites (5h / 7d) não. Para os ter:
+                                          instala o Claude Code CLI, corre
+                                          'claude' num terminal e faz /login.
+                                          Depois: botão direito no widget >
+                                          "Atualizar agora".
 
 4. Reinicia as sessões do Claude Code que já estavam abertas, para passarem a
    enviar dados ao widget.
 
 O widget é copiado para %LOCALAPPDATA%\Programs\ClaudeUsageWidget, por isso
-podes apagar esta pasta depois de instalar.
+podes apagar esta pasta depois de instalar. Não é preciso PowerShell; o
+install.ps1 que vem no zip só existe para as instruções antigas.
 
 
 USAR
@@ -98,18 +100,24 @@ USAR
 
 O QUE O INSTALADOR ALTERA
 -------------------------
+  - Copia ClaudeUsageWidget.exe e ClaudeUsageFeed.exe para
+    %LOCALAPPDATA%\Programs\ClaudeUsageWidget. O ClaudeUsageFeed.exe é o que o
+    Claude Code chama para mandar dados ao widget.
   - Em %USERPROFILE%\.claude\settings.json: o "statusLine" e um hook
-    "Notification". Antes guarda uma cópia (settings.json.bak-usage-widget-...).
-    Se já tinhas um statusline, ele continua a funcionar: o do widget chama-o.
+    "Notification", ambos para o ClaudeUsageFeed.exe. Antes guarda uma cópia
+    (settings.json.bak-usage-widget-...). Se já tinhas um statusline, ele
+    continua a funcionar: o do widget chama-o.
   - Cria a pasta %USERPROFILE%\.claude\usage-widget (dados e registo do widget).
-  - Com -AutoStart: uma entrada de arranque em HKCU\...\Run.
+  - Se escolheres "Iniciar o widget com o Windows": uma entrada de arranque em
+    HKCU\...\Run.
 
 
 DESINSTALAR
 -----------
-     powershell -ExecutionPolicy Bypass -File .\install.ps1 -Uninstall
+  Botão direito no widget > Definições > "Desinstalar…".
 
-  Remove o widget e repõe o statusline que tinhas antes.
+  Repõe o statusline que tinhas antes, tira o aviso do Claude Code e apaga o
+  widget, as definições e o histórico dele.
 
 
 PROBLEMAS
@@ -122,8 +130,9 @@ PROBLEMAS
     Fica também em %USERPROFILE%\.claude\usage-widget\diagnostico.txt.
     Se o widget nem arranca, corre isto para o gerar:
       %LOCALAPPDATA%\Programs\ClaudeUsageWidget\ClaudeUsageWidget.exe --diagnostics
-  - O comando dá erro de política de execução ou o antivírus apaga o .exe:
-    o PC tem regras da empresa contra programas não assinados. Fala com o IT.
+  - O Windows não deixa abrir o .exe (sem "Executar mesmo assim") ou o
+    antivírus apaga-o: o PC tem regras da empresa contra programas não
+    assinados. Fala com o IT.
   - O widget mostra "--": ainda não há leituras. Usa o Claude Code uma vez ou
     faz botão direito > "Atualizar agora".
   - Registo de erros: %USERPROFILE%\.claude\usage-widget\widget.log

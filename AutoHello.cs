@@ -23,6 +23,9 @@ public class AutoHello
     /// <summary>The last hello answered but without the limits, which earlier ones carried.</summary>
     public bool LostLimits { get; private set; }
 
+    /// <summary>What the last hello came to, as logged: which Claude Code answered and the limits, or why it failed.</summary>
+    public string LastResult { get; private set; } = "";
+
     /// <summary>Consecutive failed hellos, and when the next try is allowed (unix seconds).</summary>
     public (int Failures, long NextAttemptAt) Backoff => (_state.Attempts, _state.NextAttemptAt);
 
@@ -111,15 +114,17 @@ public class AutoHello
                 _state.NextAttemptAt = 0;
                 LostLimits = limits is null && _state.HelloHadLimits;
                 if (limits is not null) _state.HelloHadLimits = true;
-                Log.Write(limits is null
+                LastResult = limits is null
                     ? $"Hello enviado ({used}); sem limites na resposta, a usar estimativa."
-                    : $"Hello enviado ({used}); 5h {limits.FiveHour?.UsedPercentage:0}%, 7d {limits.SevenDay?.UsedPercentage:0}%.");
+                    : $"Hello enviado ({used}); 5h {limits.FiveHour?.UsedPercentage:0}%, 7d {limits.SevenDay?.UsedPercentage:0}%.";
+                Log.Write(LastResult);
             }
             else
             {
                 _state.Attempts++;
                 _state.NextAttemptAt = now + BackoffSeconds[Math.Min(_state.Attempts, BackoffSeconds.Length) - 1];
-                Log.Write($"Hello falhou (tentativa {_state.Attempts}): {detail}");
+                LastResult = $"Hello falhou (tentativa {_state.Attempts}): {detail}";
+                Log.Write(LastResult);
             }
             Json.Save(Paths.State, _state);
             return ok;

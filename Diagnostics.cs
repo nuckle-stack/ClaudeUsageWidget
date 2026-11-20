@@ -170,12 +170,15 @@ public static class Diagnostics
                 ? Str(sl, "command") : "";
             lines.Add("Statusline: " + StatusLineKind(command, widgetDir));
 
-            var hook = root.TryGetProperty("hooks", out var hooks) && hooks.ValueKind == JsonValueKind.Object &&
-                       hooks.TryGetProperty("Notification", out var notification) &&
-                       notification.ToString() is var entries &&
-                       entries.Contains("usage-widget", StringComparison.OrdinalIgnoreCase) &&
-                       entries.Contains("notify.ps1", StringComparison.OrdinalIgnoreCase);
-            lines.Add("Hook Notification do widget: " + (hook ? "instalado" : "em falta (os pedidos \"precisa de ti\" não chegam ao widget)"));
+            var hookCommands = HookCommands(root, "Notification");
+            var hook = hookCommands.Any(c => c.Contains(Installer.FeedName, StringComparison.OrdinalIgnoreCase)) ? "instalado"
+                : hookCommands.Any(c => c.Contains("usage-widget", StringComparison.OrdinalIgnoreCase) && c.Contains("notify.ps1", StringComparison.OrdinalIgnoreCase))
+                    ? "instalado, ainda pelo PowerShell (notify.ps1)"
+                    : "em falta (os pedidos \"precisa de ti\" não chegam ao widget)";
+            lines.Add("Hook Notification do widget: " + hook);
+            // The feed both point at: it must be there, or Claude Code runs nothing.
+            if (hookCommands.Prepend(command).Select(FeedPath).FirstOrDefault(p => p is not null) is { } feed)
+                lines.Add($"{Installer.FeedName}: {(File.Exists(feed) ? "existe" : "em falta")} ({feed})");
             if (root.TryGetProperty("disableAllHooks", out var off) && off.ValueKind == JsonValueKind.True)
                 lines.Add("disableAllHooks: ligado (nenhum hook corre, nem o do widget)");
             if (root.TryGetProperty("apiKeyHelper", out _)) lines.Add("apiKeyHelper: definido (a conta pode ser por chave de API, sem limites 5h/7d)");
@@ -184,19 +187,41 @@ public static class Diagnostics
                 lines.Add($"env (só os nomes): {string.Join(", ", names)}");
         }
 
-        lines.Add($"Ficheiros do widget: feed.ps1 {Exists(widgetDir, "feed.ps1")}, notify.ps1 {Exists(widgetDir, "notify.ps1")}");
         return lines;
-
-        static string Exists(string dir, string name) => File.Exists(Path.Combine(dir, name)) ? "existe" : "em falta";
     }
 
-    /// <summary>Whether the statusline feeds the widget, the way install.ps1 decides it.</summary>
+    /// <summary>The commands of one hook event's entries in settings.json.</summary>
+    private static List<string> HookCommands(JsonElement root, string hookEvent)
+    {
+        var commands = new List<string>();
+        if (!root.TryGetProperty("hooks", out var hooks) || hooks.ValueKind != JsonValueKind.Object ||
+            !hooks.TryGetProperty(hookEvent, out var entries) || entries.ValueKind != JsonValueKind.Array) return commands;
+        foreach (var entry in entries.EnumerateArray())
+            if (entry.ValueKind == JsonValueKind.Object && entry.TryGetProperty("hooks", out var list) && list.ValueKind == JsonValueKind.Array)
+                foreach (var h in list.EnumerateArray())
+                    if (h.ValueKind == JsonValueKind.Object && Str(h, "command") is { Length: > 0 } c) commands.Add(c);
+        return commands;
+    }
+
+    /// <summary>The ClaudeUsageFeed.exe a command runs ("C:\...\ClaudeUsageFeed.exe" statusline), or null.</summary>
+    internal static string? FeedPath(string command)
+    {
+        var quoted = Regex.Match(command, "\"([^\"]*" + Regex.Escape(Installer.FeedName) + ")\"", RegexOptions.IgnoreCase);
+        if (quoted.Success) return quoted.Groups[1].Value;
+        var bare = Regex.Match(command, @"(\S*" + Regex.Escape(Installer.FeedName) + ")", RegexOptions.IgnoreCase);
+        return bare.Success ? bare.Groups[1].Value : null;
+    }
+
+    /// <summary>Whether the statusline feeds the widget, the way the installer decides it.</summary>
     internal static string StatusLineKind(string command, string widgetDir)
     {
         if (command.Length == 0) return "nenhum (os limites só chegam pelos hellos).";
+        var wrapping = File.Exists(Path.Combine(widgetDir, "wrapped-command.txt")) ? ", que chama também o statusline que já havia." : ".";
+        if (command.Contains(Installer.FeedName, StringComparison.OrdinalIgnoreCase))
+            return "o do widget (ClaudeUsageFeed.exe)" + wrapping;
         if (command.Contains("usage-widget", StringComparison.OrdinalIgnoreCase) &&
             command.Contains("feed.ps1", StringComparison.OrdinalIgnoreCase))
-            return "o feed do widget" + (File.Exists(Path.Combine(widgetDir, "wrapped-command.txt")) ? ", que chama também o statusline que já havia." : ".");
+            return "o do widget, ainda pelo PowerShell (feed.ps1)" + wrapping;
         var script = Regex.Match(command, "\"([^\"]+\\.ps1)\"|(\\S+\\.ps1)");
         if (script.Success)
         {

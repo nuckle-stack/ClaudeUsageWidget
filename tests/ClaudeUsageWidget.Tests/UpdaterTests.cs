@@ -107,8 +107,10 @@ public class UpdaterTests
         var path = Path.Combine(_dir, "ClaudeUsageWidget.zip");
         using (var zip = ZipFile.Open(path, ZipArchiveMode.Create))
         {
-            Write(zip, @"ClaudeUsageWidget\ClaudeUsageWidget.exe", "MZ");
-            if (withInstaller) Write(zip, @"ClaudeUsageWidget\install.ps1", "Write-Host hi");
+            // The widget installs itself; the feed goes with it.
+            if (withInstaller) Write(zip, @"ClaudeUsageWidget\ClaudeUsageWidget.exe", "MZ");
+            Write(zip, @"ClaudeUsageWidget\ClaudeUsageFeed.exe", "MZ");
+            Write(zip, @"ClaudeUsageWidget\install.ps1", "Write-Host hi");
         }
         return path;
 
@@ -126,8 +128,8 @@ public class UpdaterTests
     {
         var zip = Zip();
         var folder = Updater.Unpack(zip, Sha(zip), Path.Combine(_dir, "out"));
-        Assert.True(File.Exists(Path.Combine(folder, "install.ps1")));
         Assert.True(File.Exists(Path.Combine(folder, "ClaudeUsageWidget.exe")));
+        Assert.True(File.Exists(Path.Combine(folder, "ClaudeUsageFeed.exe")));
     }
 
     [Fact]

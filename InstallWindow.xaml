@@ -1,0 +1,42 @@
+<Window x:Class="ClaudeUsageWidget.InstallWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Claude Usage Widget" SizeToContent="Height" Width="460" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" FontFamily="Segoe UI" FontSize="12">
+    <StackPanel Margin="20">
+        <TextBlock x:Name="Heading" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/>
+        <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#555"
+                   Text="Um widget para o canto do ecrã com os limites do Claude Code (5 horas e semanal), as sessões abertas e avisos quando uma sessão termina ou precisa de ti."/>
+
+        <!-- Before: what it will do, and the choices. -->
+        <StackPanel x:Name="Choices" Margin="0,14,0,0">
+            <TextBlock Text="Vai:" FontWeight="SemiBold"/>
+            <TextBlock x:Name="WhereTo" Margin="10,4,0,0" TextWrapping="Wrap"/>
+            <TextBlock Margin="10,4,0,0" TextWrapping="Wrap"
+                       Text="• Ligar o statusline e o aviso &quot;precisa de ti&quot; do Claude Code, com uma cópia de segurança do settings.json. Um statusline que já tenhas continua a funcionar."/>
+            <CheckBox x:Name="AutoStart" Margin="0,14,0,0" Content="Iniciar o widget com o Windows"/>
+            <CheckBox x:Name="Check" Margin="0,8,0,0" IsChecked="True"
+                      Content="Testar a leitura dos limites (envia um &quot;hello&quot; curto no Haiku)"/>
+        </StackPanel>
+
+        <!-- During and after: each step as it is done. -->
+        <ItemsControl x:Name="Steps" Margin="0,14,0,0" Visibility="Collapsed">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,2"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <ProgressBar x:Name="Busy" Height="4" Margin="0,10,0,0" IsIndeterminate="True" Visibility="Collapsed"/>
+        <TextBlock x:Name="Outcome" Margin="0,12,0,0" TextWrapping="Wrap" FontWeight="SemiBold" Visibility="Collapsed"/>
+        <TextBlock x:Name="Hint" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="#555" Visibility="Collapsed"/>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+            <Button x:Name="CopyReport" Content="Copiar diagnóstico" Padding="10,4" Margin="0,0,8,0"
+                    Visibility="Collapsed" Click="OnCopyReport"/>
+            <Button x:Name="Go" Content="Instalar" MinWidth="90" Padding="10,4" IsDefault="True" Click="OnGo"/>
+            <Button x:Name="Cancel" Content="Cancelar" MinWidth="90" Padding="10,4" Margin="8,0,0,0" IsCancel="True"
+                    Click="OnCancel"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

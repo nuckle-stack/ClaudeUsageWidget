@@ -189,6 +189,18 @@ public partial class SettingsWindow : Window
         DialogResult = true;
     }
 
+    /// <summary>Set when the user asked to remove the widget; the main window does it, then exits.</summary>
+    public bool UninstallRequested { get; private set; }
+
+    private void OnUninstall(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(this,
+                "Remover o Claude Usage Widget?\n\nO statusline e o aviso do Claude Code voltam ao que eram antes, e o widget, as definições e o histórico dele são apagados.",
+                "Claude Usage Widget", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        UninstallRequested = true;
+        DialogResult = false;
+    }
+
     private void Fail(string message)
     {
         Error.Text = message;

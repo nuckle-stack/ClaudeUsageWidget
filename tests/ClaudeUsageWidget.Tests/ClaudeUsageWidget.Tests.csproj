@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\ClaudeUsageWidget.csproj" />
+    <ProjectReference Include="..\..\feed\ClaudeUsageFeed.csproj" />
   </ItemGroup>
 
   <ItemGroup>

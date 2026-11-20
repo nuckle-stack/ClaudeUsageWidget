@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Claude Code's statusline command and Notification hook for the widget.
+       Claude Code starts it on every statusline refresh, so it is a small
+       console program on its own, not the widget: trimmed, invariant culture,
+       no WPF. It replaces feed.ps1 and notify.ps1, so nothing needs PowerShell. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>ClaudeUsageFeed</AssemblyName>
+    <RootNamespace>ClaudeUsageFeed</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ClaudeUsageWidget.Tests" />
+  </ItemGroup>
+
+</Project>
