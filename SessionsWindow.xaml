@@ -27,6 +27,42 @@
                 </Grid>
                 <local:Sparkline x:Name="Chart7" Height="38" Margin="0,5,0,0"/>
             </StackPanel>
+            <!-- Who used it: this window's (or week's) usage split by project. -->
+            <StackPanel x:Name="UseBox" Margin="0,0,0,12" Visibility="Collapsed">
+                <Grid>
+                    <TextBlock x:Name="UseTitle" Foreground="#99FFFFFF" FontWeight="SemiBold"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                        <TextBlock x:Name="UseTab5" Text="5h" FontSize="10" Cursor="Hand" Padding="4,0"
+                                   MouseLeftButtonUp="OnUseTab5"/>
+                        <TextBlock x:Name="UseTab7" Text="semana" FontSize="10" Cursor="Hand" Padding="4,0,0,0"
+                                   MouseLeftButtonUp="OnUseTab7"/>
+                    </StackPanel>
+                </Grid>
+                <ItemsControl x:Name="UseList" Margin="0,5,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,2" Background="Transparent" ToolTip="{Binding Detail}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="96"/>
+                                    <ColumnDefinition Width="36"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding Name}" Foreground="#E6FFFFFF" TextTrimming="CharacterEllipsis"
+                                           Margin="0,0,8,0"/>
+                                <Border Grid.Column="1" Height="5" CornerRadius="2.5" Background="#1FFFFFFF"
+                                        VerticalAlignment="Center">
+                                    <Border Width="{Binding BarWidth}" HorizontalAlignment="Left" CornerRadius="2.5"
+                                            Background="#60A5FA"/>
+                                </Border>
+                                <TextBlock Grid.Column="2" Text="{Binding Percent}" Foreground="#B3FFFFFF"
+                                           TextAlignment="Right"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="UseNote" Foreground="#80FFFFFF" FontSize="10" Margin="0,4,0,0" TextWrapping="Wrap"
+                           ToolTip="Reparte o uso do Claude Code neste PC pelo que custaria na API: o Opus pesa mais do que o Sonnet ou o Haiku, e ler da cache quase nada. A Anthropic não publica como a subscrição conta o uso, por isso as proporções são indicativas. Não inclui conversas no claude.ai nem outros computadores."/>
+            </StackPanel>
             <TextBlock x:Name="Header" Foreground="#99FFFFFF" FontWeight="SemiBold" Margin="0,0,0,4"/>
             <TextBlock x:Name="Empty" Text="Nenhuma sessão do Claude Code ativa." Foreground="#99FFFFFF"
                        Margin="0,6,0,2" Visibility="Collapsed"/>
@@ -96,6 +132,8 @@
                                                FontWeight="SemiBold" TextAlignment="Right" ToolTip="Qualidade do contexto (token-optimizer)"/>
                                     <TextBlock Text="{Binding Fill}" Foreground="#80FFFFFF" FontSize="10" TextAlignment="Right"
                                                ToolTip="Contexto ocupado"/>
+                                    <TextBlock Text="{Binding Use}" Foreground="#93C5FD" FontSize="10" TextAlignment="Right"
+                                               ToolTip="{Binding UseTip}"/>
                                 </StackPanel>
                             </Grid>
                         </Border>

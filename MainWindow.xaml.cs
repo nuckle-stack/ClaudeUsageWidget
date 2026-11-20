@@ -56,7 +56,13 @@ public partial class MainWindow : Window
         };
         Root.ContextMenu.Opened += (_, _) => FillQuietMenu();
         FillQuietMenu();
-        Loaded += (_, _) => { PlaceWindow(); Tick(); };
+        Loaded += (_, _) =>
+        {
+            PlaceWindow();
+            Tick();
+            // Read the week of transcripts now, so the sessions list opens with it.
+            _ = UsageLedger.Shared.RefreshAsync(TimeSpan.Zero);
+        };
         _timer.Tick += (_, _) => Tick();
         _timer.Start();
     }
@@ -492,7 +498,7 @@ public partial class MainWindow : Window
         // Looking at the sessions is the acknowledgement: stop pulsing and reminding.
         _alerts.AckAll();
         UpdatePulse();
-        _sessions = new SessionsWindow(this, _cfg, _alerts, ForecastText, _history);
+        _sessions = new SessionsWindow(this, _cfg, _alerts, ForecastText, _history, () => _hello.Current(_limits));
         _sessions.Closed += (_, _) => { _sessions = null; _sessionsClosed = DateTime.UtcNow; };
         _sessions.Show();
     }

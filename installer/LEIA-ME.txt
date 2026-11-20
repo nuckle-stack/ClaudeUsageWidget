@@ -54,6 +54,10 @@ USAR
     abre a lista de sessões. Muda-se (ou desliga-se) nas Definições.
   - Se um limite esgotar e o Claude continuar com uso extra (pago à parte),
     o widget avisa. Quando um limite esgotado renova, também avisa.
+  - "Consumo", na lista de sessões: quanto da janela de 5h (ou da semana)
+    gastou cada projeto e cada sessão. É uma estimativa: reparte o uso do
+    Claude Code neste PC pelo custo equivalente na API (o Opus pesa mais do
+    que o Sonnet ou o Haiku). Não vê conversas no claude.ai nem outros PCs.
 
   Qualidade do contexto (opcional): se tiveres o plugin "token-optimizer" do
   Claude Code, cada sessão mostra também a qualidade e a ocupação do contexto
