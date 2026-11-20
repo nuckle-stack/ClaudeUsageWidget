@@ -81,6 +81,18 @@ public partial class App : Application
         _single = new Mutex(true, "ClaudeUsageWidget.SingleInstance", out var isNew);
         if (isNew) return true;
 
+        // The one holding it may be on its way out: an update closes the old
+        // widget and starts this one. Give it a moment before giving way.
+        try
+        {
+            if (_single.WaitOne(TimeSpan.FromSeconds(3)))
+            {
+                Log.Write("O widget anterior acabou de fechar; fica este.");
+                return true;
+            }
+        }
+        catch (AbandonedMutexException) { return true; }
+
         var me = Environment.ProcessPath ?? "";
         var others = Installer.OtherCopies();
         var strays = others.Where(o => !string.Equals(o.Path, me, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -92,7 +104,7 @@ public partial class App : Application
                 try
                 {
                     using var p = System.Diagnostics.Process.GetProcessById(pid);
-                    p.Kill(entireProcessTree: true);
+                    p.Kill();   // that process only: never a tree this one could be part of
                     p.WaitForExit(5000);
                 }
                 catch { }
@@ -156,6 +168,17 @@ public partial class App : Application
         {
             Step($"Não deu para instalar: {ex.Message}");
             code = 1;
+            // The old widget is closed by now: never leave the user with none.
+            var installed = System.IO.Path.Combine(dir, Installer.ExeName);
+            if (!args.Contains("--no-launch") && System.IO.File.Exists(installed))
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(installed) { UseShellExecute = true, WorkingDirectory = dir });
+                    Step("Aberto o widget que estava instalado.");
+                }
+                catch { }
+            }
         }
         try
         {

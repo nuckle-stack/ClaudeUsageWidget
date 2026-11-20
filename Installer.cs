@@ -422,12 +422,18 @@ public static class Installer
             try
             {
                 using var p = Process.GetProcessById(other.Pid);
-                p.Kill(entireProcessTree: true);
+                // That process only, never its tree: an update's installer is a
+                // child of the widget it replaces, and would kill itself with it.
+                p.Kill();
                 p.WaitForExit(5000);
                 Log.Write($"Instalação: fechada outra cópia do widget (pid {other.Pid}, {other.Path}).");
             }
             catch { }
         }
+        // Gone for good before going on: a widget still closing keeps the
+        // single-instance lock, and the new one would give way to it.
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (OtherCopies().Count > 0 && DateTime.UtcNow < deadline) Thread.Sleep(200);
     }
 
     /// <summary>The other ClaudeUsageWidget processes running: their id, exe and start.</summary>
