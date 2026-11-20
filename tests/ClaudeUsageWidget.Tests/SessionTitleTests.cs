@@ -18,7 +18,7 @@ public class SessionTitleTests
     private const string Chatter = """{"type":"user","message":{"content":"hi"}}""" + "\n";
 
     private string For(string id, string name = "project-12", string source = "derived") =>
-        Titles.For(_claudeDir, id, Cwd, name, source);
+        Transcripts.Title(_claudeDir, id, Cwd, name, source);
 
     [Fact]
     public void Generated_title_replaces_the_folder_name()

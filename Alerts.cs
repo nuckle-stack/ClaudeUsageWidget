@@ -53,7 +53,7 @@ public class ContextWatch
             if (!full) _nearlyFull.Remove(s.SessionId);
             else if (_nearlyFull.Add(s.SessionId))
                 result.Add(("Contexto quase cheio",
-                    $"{s.Name}\n{Math.Round(s.FillPct!.Value)}% ocupado. Compacta ou abre uma sessão nova.", s));
+                    $"{s.Name}\n{(s.FillEstimated ? "Cerca de " : "")}{Math.Round(s.FillPct!.Value)}% ocupado. Compacta ou abre uma sessão nova.", s));
         }
 
         var ids = live.Select(s => s.SessionId).ToHashSet();

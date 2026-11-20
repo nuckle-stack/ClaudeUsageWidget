@@ -205,6 +205,67 @@ Describe 'feed.ps1 prints a statusline' {
     }
 }
 
+Describe "feed.ps1 records each session's context window" {
+    BeforeAll {
+        # The part of the statusline JSON that describes the context.
+        function New-ContextInput([string]$Session, [long]$Size = 1000000, [long]$Tokens = 247316, $Pct = 25) {
+            [ordered]@{
+                session_id = $Session
+                model = @{ id = 'claude-opus-5-5'; display_name = 'Opus 5.5' }
+                context_window = [ordered]@{
+                    total_input_tokens = $Tokens; total_output_tokens = 199
+                    context_window_size = $Size; used_percentage = $Pct; remaining_percentage = 75
+                }
+            } | ConvertTo-Json -Depth 5 -Compress
+        }
+        function Get-Context([string]$ConfigDir, [string]$Session) {
+            Get-Content -LiteralPath (Join-Path $ConfigDir "usage-widget\context\$Session.json") -Raw | ConvertFrom-Json
+        }
+    }
+
+    It 'writes one file per session, with the window Claude Code reports' {
+        $dir = New-ConfigDir
+        $before = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        (Invoke-Feed $dir (New-ContextInput 'a76f3eaa-7b50')).Exit | Should -Be 0
+        Invoke-Feed $dir (New-ContextInput 'other-session' -Size 200000 -Tokens 50000) | Out-Null
+
+        $c = Get-Context $dir 'a76f3eaa-7b50'
+        $c.size | Should -Be 1000000
+        $c.tokens | Should -Be 247316
+        $c.used_percentage | Should -Be 25
+        $c.model | Should -Be 'claude-opus-5-5'
+        $c.updated_at | Should -BeGreaterOrEqual $before
+        (Get-Context $dir 'other-session').size | Should -Be 200000
+        Get-ChildItem (Join-Path $dir 'usage-widget\context') -Filter '*.tmp' | Should -BeNullOrEmpty
+    }
+
+    It 'records the window before the first answer too' {
+        $dir = New-ConfigDir
+        Invoke-Feed $dir '{"session_id":"s1","model":{"id":"claude-opus-5-5"},"context_window":{"total_input_tokens":0,"context_window_size":1000000,"used_percentage":null}}' | Out-Null
+        $c = Get-Context $dir 's1'
+        $c.size | Should -Be 1000000
+        $c.tokens | Should -Be 0
+        $c.used_percentage | Should -BeNullOrEmpty
+    }
+
+    It 'writes nowhere for a session id that is not a plain name: <Id>' -ForEach @(
+        @{ Id = '..\..\evil' }
+        @{ Id = 'a/b' }
+        @{ Id = '' }
+    ) {
+        $dir = New-ConfigDir
+        (Invoke-Feed $dir (New-ContextInput $Id)).Exit | Should -Be 0
+        Join-Path $dir 'usage-widget\context' | Should -Not -Exist
+        Get-ChildItem $TestDrive -Recurse -Filter 'evil*' | Should -BeNullOrEmpty
+    }
+
+    It 'writes nothing when the input has no context window' {
+        $dir = New-ConfigDir
+        Invoke-Feed $dir (New-Input @(1, $R5) @(1, $R7)) | Out-Null
+        Join-Path $dir 'usage-widget\context' | Should -Not -Exist
+    }
+}
+
 Describe 'feed.ps1 hands over to the previous statusline' {
     BeforeAll {
         # Stands in for the user's own statusline: reports the first byte it

@@ -205,7 +205,7 @@ public class UsageLedger
 
     private string TitleOf(string sessionId, string cwd)
     {
-        var title = Titles.For(_claudeDir, sessionId, cwd, "", "derived");
+        var title = Transcripts.Title(_claudeDir, sessionId, cwd, "", "derived");
         return title.Length > 0 ? title : "sessão " + sessionId[..Math.Min(8, sessionId.Length)];
     }
 

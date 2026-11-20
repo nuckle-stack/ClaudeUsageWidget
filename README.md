@@ -39,6 +39,7 @@ dotnet test tests\ClaudeUsageWidget.Tests
 Cobrem a previsão do ritmo de uso e os avisos de 80/95%, o agendamento do
 auto-hello, a leitura da saída do `claude -p` (com uma linha `rate_limit_event`
 real), os títulos das sessões, os lembretes dos avisos, o consumo por projeto,
+o contexto ocupado de cada sessão (com e sem o tamanho da janela do statusline),
 a parte do dia do limite semanal e o diagnóstico (incluindo o que ele não pode
 levar: nomes de sessões, valores de variáveis, a pasta do utilizador). Correm em
 menos de um segundo.
@@ -97,8 +98,9 @@ próprio Pester; a primeira linha levanta isso apenas na janela atual.
 
 Cada teste corre o `feed.ps1` verdadeiro num processo à parte, com o JSON no
 stdin como faz o Claude Code. Cobrem a junção das leituras de várias sessões,
-as escritas em simultâneo, a linha impressa e a passagem para um statusline que
-já existisse. Demoram cerca de 15 segundos.
+as escritas em simultâneo, o ficheiro do contexto de cada sessão, a linha
+impressa e a passagem para um statusline que já existisse. Demoram cerca de
+15 segundos.
 
 ## Estrutura
 

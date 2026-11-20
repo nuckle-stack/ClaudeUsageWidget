@@ -62,12 +62,17 @@ USAR
     gastou cada projeto e cada sessão. É uma estimativa: reparte o uso do
     Claude Code neste PC pelo custo equivalente na API (o Opus pesa mais do
     que o Sonnet ou o Haiku). Não vê conversas no claude.ai nem outros PCs.
+  - "45% ctx", em cada sessão: quanto do contexto da sessão está ocupado. A
+    partir de 80% fica cor de laranja e o widget avisa: é altura de /compact
+    ou de uma sessão nova. Com "~" à frente é uma estimativa: nas sessões da
+    app Desktop e do VS Code o widget não sabe ao certo o tamanho da janela
+    (200k ou 1M); passa a saber quando usares o mesmo modelo no terminal.
 
-  Qualidade do contexto (opcional): se tiveres o plugin "token-optimizer" do
-  Claude Code, cada sessão mostra também a qualidade e a ocupação do contexto
-  (ex. "Q 72 B" e "45% ctx"), e o widget avisa quando o contexto degrada ou está
-  quase cheio. Sem o plugin essas colunas ficam vazias; tudo o resto funciona.
-  O widget não depende de nenhuma skill nem servidor MCP.
+  Qualidade do contexto (opcional): com o plugin "token-optimizer" do Claude
+  Code, cada sessão mostra também uma nota da qualidade do contexto (ex.
+  "Q 72 B"), e o widget avisa quando ela degrada. Sem o plugin essa nota não
+  aparece; tudo o resto funciona. O widget não depende de nenhuma skill nem
+  servidor MCP.
 
 
 O QUE O INSTALADOR ALTERA

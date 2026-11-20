@@ -90,6 +90,11 @@ public static class Diagnostics
         Line("Pedidos do hook (events.jsonl): " + (events.Exists
             ? $"{events.Length / 1024.0:0.#} KB, alterado {Ago(new DateTimeOffset(events.LastWriteTimeUtc).ToUnixTimeSeconds(), now)}"
             : "ainda não existe (nenhuma sessão pediu nada desde a instalação, ou o hook não corre)."));
+        var contextDir = new DirectoryInfo(Path.Combine(Paths.Dir, "context"));
+        var reports = contextDir.Exists ? contextDir.GetFiles("*.json") : [];
+        Line("Janelas de contexto (context\\): " + (reports.Length > 0
+            ? $"{reports.Length} sessão(ões), a última {Ago(new DateTimeOffset(reports.Max(f => f.LastWriteTimeUtc)).ToUnixTimeSeconds(), now)}"
+            : "nenhuma (o statusline ainda não as escreveu: o \"% ctx\" é estimado)."));
 
         Section("Definições");
         var cfg = live.Config;

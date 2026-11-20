@@ -11,7 +11,7 @@ public partial class SessionsWindow : Window
     /// <summary>One row, already formatted for the template.</summary>
     public record Row(
         int Pid, string SessionId, string Kind, Brush KindBack, Brush KindFore, string Name, string Cwd,
-        string Status, Brush StatusBrush, string Quality, Brush QualityBrush, string Fill,
+        string Status, Brush StatusBrush, string Quality, Brush QualityBrush, string Fill, Brush FillBrush, string FillTip,
         double Opacity, string Action, string ActionTip, long StatusStamp, string Use, string UseTip);
 
     /// <summary>One project in the usage breakdown.</summary>
@@ -223,7 +223,7 @@ public partial class SessionsWindow : Window
 
         var quality = s.Quality is { } q ? $"Q {Math.Round(q)}" + (s.Grade is { } g ? $" {g}" : "") : "";
         var qBrush = s.Quality switch { null => Grey, < 50 => Red, < 70 => Yellow, _ => Green };
-        var fill = s.FillPct is { } f ? $"{Math.Round(f)}% ctx" : "";
+        var (fill, fillBrush, fillTip) = FillCell(s);
 
         var (action, tip) = ("", "");
         var opacity = 1.0;
@@ -243,7 +243,22 @@ public partial class SessionsWindow : Window
                               : "Parte do consumo desta janela de 5h neste PC (estimativa)";
 
         return new Row(s.Pid, s.SessionId, s.Kind, back, fore, s.Name, ShortPath(s.Cwd),
-            status, statusBrush, quality, qBrush, fill, opacity, action, tip, s.StatusUpdatedAt, use, useTip);
+            status, statusBrush, quality, qBrush, fill, fillBrush, fillTip, opacity, action, tip, s.StatusUpdatedAt, use, useTip);
+    }
+
+    /// <summary>"45% ctx", "~" when the window's size is a guess, orange from the alert's threshold up.</summary>
+    private (string Text, Brush Brush, string Tip) FillCell(SessionInfo s)
+    {
+        if (s.FillPct is not { } f) return ("", Grey, "");
+        var text = $"{(s.FillEstimated ? "~" : "")}{Math.Round(f)}% ctx";
+        var threshold = _cfg.ContextAlerts.FillAbove;
+        var brush = threshold > 0 && f >= threshold ? Orange : Grey;
+        var tip = "Contexto ocupado";
+        if (s.ContextSize > 0) tip += $": {Tokens(s.ContextTokens)} de {Tokens(s.ContextSize)} tokens";
+        if (s.FillEstimated) tip += "\nEstimativa: sem o statusline (app Desktop, VS Code), o tamanho da janela é presumido.";
+        return (text, brush, tip);
+
+        static string Tokens(long n) => n >= 1_000_000 ? $"{n / 1e6:0.#}M" : $"{n / 1000.0:0}k";
     }
 
     // ---- hiding ------------------------------------------------------------

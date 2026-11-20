@@ -55,6 +55,34 @@ if ($null -ne $data.rate_limits) {
     } catch { }
 }
 
+# Each session's context, for the widget's "% ctx" column. Only Claude Code
+# knows the window's size (the same model can run with 200k or 1M), and the
+# transcript does not record it. One file per session: no two sessions ever
+# write the same one.
+$ctx = $data.context_window
+if ($null -ne $ctx -and $null -ne $ctx.context_window_size -and [string]$data.session_id -match '^[A-Za-z0-9_-]{1,100}$') {
+    try {
+        $cDir = Join-Path $wDir 'context'
+        if (-not (Test-Path -LiteralPath $cDir)) { New-Item -ItemType Directory -Path $cDir -Force | Out-Null }
+        $cFile = Join-Path $cDir "$($data.session_id).json"
+        $entry = [ordered]@{
+            updated_at = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+            model = [string]$data.model.id
+            size = [long]$ctx.context_window_size
+            tokens = [long]$ctx.total_input_tokens
+            # Null before the session's first answer.
+            used_percentage = $ctx.used_percentage
+        }
+        $tmp = "$cFile.$PID.tmp"
+        try {
+            [IO.File]::WriteAllText($tmp, ($entry | ConvertTo-Json -Compress))
+            Move-Item -LiteralPath $tmp -Destination $cFile -Force
+        } finally {
+            if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force }
+        }
+    } catch { }
+}
+
 $stdout = [Console]::OpenStandardOutput()
 function Write-Out([string]$text) {
     $bytes = $utf8.GetBytes($text)

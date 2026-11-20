@@ -20,7 +20,14 @@ public class SessionInfo
     // From the token-optimizer plugin's per-session cache; null without it.
     public double? Quality { get; init; }
     public string? Grade { get; init; }
+
+    /// <summary>How full the context is, in percent; null before the first answer.</summary>
     public double? FillPct { get; init; }
+    /// <summary>True when the window's size behind FillPct is a guess (no statusline for this session).</summary>
+    public bool FillEstimated { get; init; }
+    /// <summary>Tokens in context and the window's size, when known.</summary>
+    public long ContextTokens { get; init; }
+    public long ContextSize { get; init; }
 
     public bool IsSdk => Kind == "SDK";
 }
@@ -53,11 +60,14 @@ public static class SessionScanner
 
                 var sessionId = Str(root, "sessionId");
                 var cwd = Str(root, "cwd");
-                var name = Titles.For(claudeDir, sessionId, cwd, Str(root, "name"), Str(root, "nameSource"));
+                var name = Transcripts.Title(claudeDir, sessionId, cwd, Str(root, "name"), Str(root, "nameSource"));
                 if (name.Length == 0) name = Path.GetFileName(cwd.TrimEnd('\\', '/'));
                 var started = Long(root, "startedAt");
 
-                var (quality, grade, fill) = ReadQuality(claudeDir, sessionId);
+                var (quality, grade, pluginFill) = ReadQuality(claudeDir, sessionId);
+                // Claude Code's own window beats the plugin's figure; the plugin's beats a guessed window.
+                var ctx = ContextWindow.For(claudeDir, sessionId, cwd);
+                var fill = ctx is { Exact: true } ? ctx.Percent : pluginFill ?? ctx?.Percent;
                 result.Add(new SessionInfo
                 {
                     Pid = pid,
@@ -71,6 +81,9 @@ public static class SessionScanner
                     Quality = quality,
                     Grade = grade,
                     FillPct = fill,
+                    FillEstimated = ctx is { Exact: false } && pluginFill is null,
+                    ContextTokens = ctx?.Tokens ?? 0,
+                    ContextSize = ctx?.Size ?? 0,
                 });
             }
             catch { }
@@ -141,14 +154,15 @@ public static class SessionScanner
 }
 
 /// <summary>
-/// The title a session shows in its terminal tab. The session file only has a
-/// name derived from the folder ("claudeusagewidget-79"); the real title lives
-/// in the transcript, as "custom-title" lines (/rename) and "ai-title" lines
-/// (generated). Transcripts grow to many MB and the list refreshes every few
-/// seconds, so each one is read incrementally: only the bytes added since the
-/// last pass.
+/// What a session's transcript says that its session file does not: the
+/// title it shows in its terminal tab, and how big its context was at the
+/// last answer. The session file only has a name derived from the folder
+/// ("claudeusagewidget-79"); the real title is in "custom-title" lines
+/// (/rename) and "ai-title" lines (generated). Transcripts grow to many MB and
+/// the list refreshes every few seconds, so each one is read incrementally:
+/// only the bytes added since the last pass.
 /// </summary>
-public static class Titles
+public static class Transcripts
 {
     private class Entry
     {
@@ -157,24 +171,43 @@ public static class Titles
         public long Offset;
         public string Custom = "";
         public string Ai = "";
+        public long Tokens;
+        public string Model = "";
+        public long AnsweredAt;
     }
 
     private static readonly Dictionary<string, Entry> Cache = new();
 
-    public static string For(string claudeDir, string sessionId, string cwd, string name, string nameSource)
+    public static string Title(string claudeDir, string sessionId, string cwd, string name, string nameSource)
     {
         if (sessionId.Length == 0) return name;
         // The widget scans on a worker thread, the sessions popup on the UI thread.
         lock (Cache)
         {
-            if (!Cache.TryGetValue(sessionId, out var e)) Cache[sessionId] = e = new Entry();
-            try { Read(claudeDir, sessionId, cwd, e); } catch { }
-
+            var e = Refresh(claudeDir, sessionId, cwd);
             // A name the user gave wins; a name derived from the folder is the last resort.
             if (e.Custom.Length > 0) return e.Custom;
             if (name.Length > 0 && nameSource != "derived") return name;
             return e.Ai.Length > 0 ? e.Ai : name;
         }
+    }
+
+    /// <summary>The context the last answer was given with (tokens), its model and when (unix seconds); null before any answer.</summary>
+    public static (long Tokens, string Model, long At)? LastAnswer(string claudeDir, string sessionId, string cwd)
+    {
+        if (sessionId.Length == 0) return null;
+        lock (Cache)
+        {
+            var e = Refresh(claudeDir, sessionId, cwd);
+            return e.Tokens > 0 ? (e.Tokens, e.Model, e.AnsweredAt) : null;
+        }
+    }
+
+    private static Entry Refresh(string claudeDir, string sessionId, string cwd)
+    {
+        if (!Cache.TryGetValue(sessionId, out var e)) Cache[sessionId] = e = new Entry();
+        try { Read(claudeDir, sessionId, cwd, e); } catch { }
+        return e;
     }
 
     /// <summary>
@@ -219,6 +252,11 @@ public static class Titles
         var text = System.Text.Encoding.UTF8.GetString(buffer, 0, end);
         foreach (var line in text.Split('\n'))
         {
+            if (line.Contains("\"usage\"") && line.Contains("\"assistant\""))
+            {
+                ReadAnswer(line, e);
+                continue;
+            }
             var custom = line.Contains("\"custom-title\"");
             if (!custom && !line.Contains("\"ai-title\"")) continue;
             try
@@ -233,6 +271,35 @@ public static class Titles
             }
             catch (JsonException) { }
         }
+    }
+
+    /// <summary>
+    /// An answer's context, counted as Claude Code counts it for its own
+    /// "% used": everything the request sent, new, cache-written and cached.
+    /// </summary>
+    private static void ReadAnswer(string line, Entry e)
+    {
+        // A subagent's turns run in a context of their own.
+        if (line.Contains("\"isSidechain\":true")) return;
+        try
+        {
+            using var doc = JsonDocument.Parse(line);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object || Text(root, "type") != "assistant" ||
+                !root.TryGetProperty("message", out var m) || m.ValueKind != JsonValueKind.Object ||
+                !m.TryGetProperty("usage", out var u) || u.ValueKind != JsonValueKind.Object) return;
+            var tokens = Count(u, "input_tokens") + Count(u, "cache_creation_input_tokens") + Count(u, "cache_read_input_tokens");
+            if (tokens <= 0) return;   // e.g. "<synthetic>" error lines
+            e.Tokens = tokens;
+            e.Model = Text(m, "model");
+            e.AnsweredAt = DateTimeOffset.TryParse(Text(root, "timestamp"), out var at) ? at.ToUnixTimeSeconds() : 0;
+        }
+        catch (JsonException) { }
+
+        static string Text(JsonElement el, string name) =>
+            el.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
+        static long Count(JsonElement el, string name) =>
+            el.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var n) ? n : 0;
     }
 
     /// <summary>
