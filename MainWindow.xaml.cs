@@ -530,15 +530,42 @@ public partial class MainWindow : Window
     /// <summary>
     /// The global shortcut: to the session waiting for you longest (input
     /// before finished tasks); pressed again, to the next one. With nobody
-    /// waiting, it opens the sessions list.
+    /// waiting, it goes round the open sessions; the list only when there are none.
     /// </summary>
     private void GoToWaiting()
     {
         var waiting = _alerts.Waiting();
         // The one already in front has been seen: move on to the next.
         var next = waiting.FirstOrDefault(a => !WindowFocus.IsForeground(a.Pid, a.Name));
-        if (next is not null) GoTo(next.Pid, next.Name, next.SessionId);
-        else if (waiting.Count == 0) OpenSessions();
+        if (next is not null)
+        {
+            GoTo(next.Pid, next.Name, next.SessionId);
+            return;
+        }
+        if (waiting.Count > 0) return;   // the only one waiting is the one in front
+
+        // Nobody waiting: still a jump, never a dead key. From another program,
+        // to the session that changed last (the one most likely on your mind);
+        // from a session, on to the next, in the order they were opened.
+        var sessions = SessionScanner.Scan()
+            .Where(s => !s.IsSdk && !_cfg.HiddenSessions.ContainsKey(s.SessionId))
+            .ToList();
+        if (NextInTurn(sessions, s => WindowFocus.IsForeground(s.Pid, s.Name)) is { } target)
+            GoTo(target.Pid, target.Name, target.SessionId);
+        else OpenSessions();
+    }
+
+    /// <summary>
+    /// With nobody waiting: from another program, the session that changed
+    /// last; from a session, the next one in the order they were opened,
+    /// round to the first. Null when none is open.
+    /// </summary>
+    internal static SessionInfo? NextInTurn(List<SessionInfo> sessions, Predicate<SessionInfo> inFront)
+    {
+        if (sessions.Count == 0) return null;
+        var ordered = sessions.OrderBy(s => s.StartedAt ?? DateTimeOffset.MaxValue).ToList();
+        var here = ordered.FindIndex(inFront);
+        return here >= 0 ? ordered[(here + 1) % ordered.Count] : ordered.MaxBy(s => s.StatusUpdatedAt);
     }
 
     /// <summary>Opens the sessions list in front, even when asked from outside the widget.</summary>

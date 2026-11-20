@@ -136,4 +136,80 @@ public class AlertTests
         // The widget just started: whatever state sessions are in is old news.
         Assert.Empty(_tracker.Update(_cfg, Session("waiting")));
     }
+
+    // ---- Claude Code's statuses ------------------------------------------------------
+
+    [Fact]
+    public void A_session_running_a_command_is_working_not_waiting_for_you()
+    {
+        // "shell" is what Claude Code shows as working, like "busy".
+        _tracker.Update(_cfg, Session("idle"));
+        Assert.Empty(After(TimeSpan.Zero, Session("shell", afterSeconds: 5)));
+        Assert.Empty(After(TimeSpan.FromMinutes(5), Session("shell")));
+        Assert.Null(_tracker.Pending);
+    }
+
+    [Fact]
+    public void A_task_with_commands_in_it_is_timed_from_its_start()
+    {
+        _tracker.Update(_cfg, Session("idle"));
+        After(TimeSpan.Zero, Session("busy", afterSeconds: 1));
+        After(TimeSpan.Zero, Session("shell", afterSeconds: 40));
+        After(TimeSpan.Zero, Session("busy", afterSeconds: 40));
+        var done = Assert.Single(After(TimeSpan.Zero, Session("idle", afterSeconds: 40)));
+        Assert.Equal(AlertKind.Done, done.Kind);
+        Assert.Equal("Tarefa de 2 min concluída.", done.Message);
+    }
+
+    [Fact]
+    public void Waiting_says_what_for_when_Claude_Code_does()
+    {
+        _tracker.Update(_cfg, Session("idle"));
+        _stampMs += 5000;
+        var waiting = new SessionInfo { Pid = 0, SessionId = _id, Name = "Estado do projeto", Kind = "CLI", Status = "waiting", WaitingFor = "permission", StatusUpdatedAt = _stampMs };
+        var alert = Assert.Single(After(TimeSpan.Zero, [waiting]));
+        Assert.Equal(AlertKind.Input, alert.Kind);
+        Assert.Equal("permission", alert.Message);
+    }
+
+    [Fact]
+    public void A_status_the_widget_does_not_know_raises_nothing()
+    {
+        _tracker.Update(_cfg, Session("idle"));
+        Assert.Empty(After(TimeSpan.Zero, Session("compacting", afterSeconds: 5)));
+    }
+
+    [Theory]
+    [InlineData("shell", "", "a correr um comando", Tone.Busy)]
+    [InlineData("waiting", "permission", "à tua espera: permission", Tone.Input)]
+    [InlineData("waiting", "", "à tua espera", Tone.Input)]
+    public void The_list_reads_each_status(string status, string waitingFor, string text, Tone tone)
+    {
+        var now = DateTimeOffset.FromUnixTimeMilliseconds(_stampMs);
+        var s = new SessionInfo { SessionId = _id, Name = "x", Kind = "CLI", Status = status, WaitingFor = waitingFor, StatusUpdatedAt = _stampMs - 120_000 };
+        var (line, lineTone) = SessionStatus.Line(s, null, now);
+        Assert.StartsWith(text, line);
+        Assert.Equal(tone, lineTone);
+    }
+
+    // ---- the shortcut with nobody waiting ------------------------------------------------
+
+    private static SessionInfo Open(string id, int startedMinute, long changedMs) => new()
+    {
+        SessionId = id, Name = id, Kind = "CLI", Status = "idle",
+        StartedAt = new DateTimeOffset(2026, 11, 20, 9, startedMinute, 0, TimeSpan.Zero), StatusUpdatedAt = changedMs,
+    };
+
+    [Fact]
+    public void The_shortcut_goes_round_the_open_sessions_when_nobody_waits()
+    {
+        List<SessionInfo> sessions = [Open("b", 20, 500), Open("a", 10, 900), Open("c", 30, 100)];
+        // From another program: the one that changed last.
+        Assert.Equal("a", MainWindow.NextInTurn(sessions, _ => false)!.SessionId);
+        // From a session: the next in the order they were opened, round to the first.
+        Assert.Equal("b", MainWindow.NextInTurn(sessions, s => s.SessionId == "a")!.SessionId);
+        Assert.Equal("c", MainWindow.NextInTurn(sessions, s => s.SessionId == "b")!.SessionId);
+        Assert.Equal("a", MainWindow.NextInTurn(sessions, s => s.SessionId == "c")!.SessionId);
+        Assert.Null(MainWindow.NextInTurn([], _ => false));
+    }
 }

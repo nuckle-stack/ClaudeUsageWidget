@@ -42,7 +42,7 @@ public static class SessionStatus
             (text, tone) = ("terminou, à tua espera", Tone.Done);
         else if (doing is { WaitsForYou: true })
             (text, tone) = ($"precisa de ti para {doing.Phrase}", Tone.Input);
-        else if (s.Status == "busy" && doing is not null)
+        else if (s.Working && doing is not null)
         {
             (text, tone) = ($"a {doing.Phrase}", Tone.Busy);
             // How long this call has been running, not the whole turn.
@@ -53,11 +53,13 @@ public static class SessionStatus
             (text, tone) = s.Status switch
             {
                 "busy" => ("a trabalhar", Tone.Busy),
+                "shell" => ("a correr um comando", Tone.Busy),
+                "waiting" => (s.WaitingFor.Length > 0 ? $"à tua espera: {s.WaitingFor}" : "à tua espera", Tone.Input),
                 "idle" => ("parada", Tone.Idle),
                 "" => ("—", Tone.Idle),
                 var other => (other, Tone.Idle),
             };
-            dot = s.Status is not ("busy" or "idle");
+            dot = s.Status is not ("busy" or "shell" or "idle");
         }
 
         // How long it has been in this state says more than the process age: the

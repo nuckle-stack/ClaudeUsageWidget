@@ -133,11 +133,13 @@ public class AlertTracker
             // An alert is stale once the session has moved on: any "done" when
             // work resumes, an "input" when the status changed after it.
             if (_alerts.TryGetValue(s.SessionId, out var current) &&
-                ((current.Kind == AlertKind.Done && s.Status == "busy") ||
+                ((current.Kind == AlertKind.Done && s.Working) ||
                  (current.Kind == AlertKind.Input && s.StatusUpdatedAt != current.StatusStamp)))
                 _alerts.Remove(s.SessionId);
 
-            if (s.Status == "busy")
+            // "busy" and "shell" (running a command) are both work: one task,
+            // timed from when the work began.
+            if (s.Working)
             {
                 _last[s.SessionId] = ("busy", had && prev.Status == "busy" ? prev.BusySince : stamp);
                 continue;
@@ -151,9 +153,11 @@ public class AlertTracker
                     if (prev.Status == "busy" && seconds >= cfg.MinTaskSeconds)
                         Raise(s, AlertKind.Done, $"Tarefa de {Duration(seconds)} concluída.");
                 }
-                else if (s.Status.Length > 0)
+                // Only "waiting" is blocked on you; a status Claude Code adds
+                // later says nothing the widget can act on.
+                else if (s.Status == "waiting")
                 {
-                    Raise(s, AlertKind.Input, s.Status);
+                    Raise(s, AlertKind.Input, s.WaitingFor.Length > 0 ? s.WaitingFor : "À espera de resposta.");
                 }
             }
             _last[s.SessionId] = (s.Status, 0);

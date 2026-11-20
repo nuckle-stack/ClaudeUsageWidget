@@ -33,6 +33,15 @@ public class SessionInfo
     public Doing? Doing { get; init; }
 
     public bool IsSdk => Kind == "SDK";
+
+    /// <summary>
+    /// Working, as Claude Code itself shows it: "busy", or "shell" while it
+    /// runs a command. Only "waiting" means it is blocked on you.
+    /// </summary>
+    public bool Working => Status is "busy" or "shell";
+
+    /// <summary>What a "waiting" session waits for, as Claude Code words it; empty when it does not say.</summary>
+    public string WaitingFor { get; init; } = "";
 }
 
 /// <summary>
@@ -98,6 +107,7 @@ public static class SessionScanner
                     Cwd = cwd,
                     Kind = KindOf(Str(root, "entrypoint")),
                     Status = Str(root, "status"),
+                    WaitingFor = Str(root, "waitingFor"),
                     StatusUpdatedAt = Long(root, "statusUpdatedAt"),
                     StartedAt = started > 0 ? DateTimeOffset.FromUnixTimeMilliseconds(started) : null,
                     Quality = quality,
@@ -115,7 +125,7 @@ public static class SessionScanner
         LastHealth = new(files, withIds, alive, withStatus, version);
         return result
             .OrderBy(s => s.IsSdk)
-            .ThenBy(s => s.Status == "busy" ? 0 : 1)
+            .ThenBy(s => s.Working ? 0 : 1)
             .ThenByDescending(s => s.StartedAt)
             .ToList();
     }
