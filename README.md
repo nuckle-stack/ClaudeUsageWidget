@@ -55,6 +55,27 @@ Quando algo não funciona noutro PC, quem lá está faz botão direito no widget
 Isto grava o mesmo relatório em `~\.claude\usage-widget\diagnostico.txt`. O
 `install.ps1` gera-o sozinho quando o teste do hello falha.
 
+## Publicar uma versão
+
+Cada versão vai para a página **Releases** do GitHub, com o zip anexado:
+
+1. Sobe o `<Version>` em `ClaudeUsageWidget.csproj` (ex. `1.0.0` → `1.1.0`), faz
+   commit e push.
+2. Corre:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\release.ps1 -NotesFile novidades.md
+   ```
+
+O `release.ps1` recusa publicar se houver alterações por gravar, se o commit
+ainda não estiver no GitHub ou se essa versão já existir. Gera o pacote com o
+`pack.ps1` e cria a tag `v<Version>` e o release, com as instruções de
+instalação e o SHA256 do zip. O `-NotesFile` é um Markdown com as novidades,
+escritas para quem usa o widget; sem ele, as notas são a lista de commits desde
+a versão anterior.
+
+A versão aparece no diagnóstico (`1.0.0+<commit>`).
+
 ### Statusline (`feed.ps1`, Pester)
 
 Na primeira vez, instala o Pester. O Windows traz a versão 3.4, que é antiga
@@ -88,3 +109,4 @@ já existisse. Demoram cerca de 15 segundos.
 | `tests\ClaudeUsageWidget.Tests\` | Testes xUnit do widget |
 | `tests\feed.Tests.ps1` | Testes Pester do `feed.ps1` |
 | `pack.ps1` | Gera o pacote em `dist\` |
+| `release.ps1` | Publica a versão do `.csproj` como release no GitHub, com o zip |
