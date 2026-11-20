@@ -270,6 +270,16 @@ if (-not $NoCheck) {
             "  Para os limites: instala o Claude Code CLI, corre 'claude' num terminal`n" +
             "  e faz /login com a tua conta. Depois: botão direito no widget > Atualizar agora.")
         if ($logLine) { Step "Detalhe: $logLine" }
+
+        # A report for whoever handed over the widget, so they can see why.
+        $diagPath = Join-Path $widgetDir 'diagnostico.txt'
+        Remove-Item -LiteralPath $diagPath -Force -ErrorAction SilentlyContinue
+        $d = Start-Process -FilePath $exeTarget -ArgumentList '--diagnostics' -WorkingDirectory $InstallDir -PassThru -WindowStyle Hidden
+        if (-not $d.WaitForExit(60000)) { & taskkill.exe /PID $d.Id /T /F 2>&1 | Out-Null }
+        if (Test-Path -LiteralPath $diagPath) {
+            Step "Diagnóstico: $diagPath"
+            Step '  Envia-o a quem te deu o widget (não leva nomes de sessões nem mensagens).'
+        }
     }
 }
 

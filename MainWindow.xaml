@@ -42,6 +42,7 @@
                 <MenuItem x:Name="SoundMenu" Header="Som dos avisos" IsCheckable="True" Click="OnToggleSound"/>
                 <MenuItem Header="Definições…" Click="OnSettings"/>
                 <MenuItem Header="Atualizar agora" Click="OnHelloNow"/>
+                <MenuItem Header="Copiar diagnóstico" Click="OnCopyDiagnostics"/>
                 <Separator/>
                 <MenuItem Header="Esconder" Click="OnHide"/>
                 <MenuItem Header="Sair" Click="OnExit"/>

@@ -38,8 +38,22 @@ dotnet test tests\ClaudeUsageWidget.Tests
 
 Cobrem a previsão do ritmo de uso e os avisos de 80/95%, o agendamento do
 auto-hello, a leitura da saída do `claude -p` (com uma linha `rate_limit_event`
-real), os títulos das sessões e os lembretes dos avisos. Correm em menos de um
-segundo.
+real), os títulos das sessões, os lembretes dos avisos, o consumo por projeto,
+a parte do dia do limite semanal e o diagnóstico (incluindo o que ele não pode
+levar: nomes de sessões, valores de variáveis, a pasta do utilizador). Correm em
+menos de um segundo.
+
+## Diagnóstico
+
+Quando algo não funciona noutro PC, quem lá está faz botão direito no widget >
+**Copiar diagnóstico** e cola o texto numa mensagem. Sem o widget a correr:
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\ClaudeUsageWidget\ClaudeUsageWidget.exe" --diagnostics
+```
+
+Isto grava o mesmo relatório em `~\.claude\usage-widget\diagnostico.txt`. O
+`install.ps1` gera-o sozinho quando o teste do hello falha.
 
 ### Statusline (`feed.ps1`, Pester)
 

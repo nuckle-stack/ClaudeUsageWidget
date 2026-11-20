@@ -319,23 +319,30 @@ public partial class MainWindow : Window
         if (hwnd == IntPtr.Zero) return;
         UnregisterHotKey(hwnd, HotkeyId);
         GoToWaitingMenu.InputGestureText = "";
+        _hotkeyState = "nenhum";
         if (string.IsNullOrWhiteSpace(_cfg.Hotkey)) return;
 
         if (!Hotkey.TryParse(_cfg.Hotkey, out var mods, out var vk))
         {
+            _hotkeyState = $"\"{_cfg.Hotkey}\" (inválido)";
             Log.Write($"Atalho inválido nas definições: \"{_cfg.Hotkey}\".");
             return;
         }
         var name = Hotkey.Format(mods, vk);
         if (!RegisterHotKey(hwnd, HotkeyId, mods | MOD_NOREPEAT, vk))
         {
+            _hotkeyState = $"{name} (ocupado por outro programa)";
             Log.Write($"Atalho {name} já está a ser usado por outro programa.");
             Notify("Claude Usage", $"O atalho {name} já está a ser usado por outro programa. Escolhe outro nas Definições.",
                 Forms.ToolTipIcon.Warning, 6000, OpenSettings);
             return;
         }
         GoToWaitingMenu.InputGestureText = name;
+        _hotkeyState = $"{name} (ativo)";
     }
+
+    /// <summary>The shortcut and whether it works, for the diagnostics.</summary>
+    private string _hotkeyState = "nenhum";
 
     [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint vk);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
@@ -539,6 +546,7 @@ public partial class MainWindow : Window
     private void OnGoToWaiting(object sender, RoutedEventArgs e) => GoToWaiting();
     private void OnSettings(object sender, RoutedEventArgs e) => OpenSettings();
     private void OnHelloNow(object sender, RoutedEventArgs e) => HelloNow();
+    private void OnCopyDiagnostics(object sender, RoutedEventArgs e) => CopyDiagnostics();
     private void OnHide(object sender, RoutedEventArgs e) => Hide();
     private void OnExit(object sender, RoutedEventArgs e) => Exit();
 
@@ -563,6 +571,47 @@ public partial class MainWindow : Window
         Notify("Claude Usage",
             ok ? "Limites atualizados." : "Atualização falhou. Ver widget.log.",
             ok ? Forms.ToolTipIcon.Info : Forms.ToolTipIcon.Warning, 4000, null);
+    }
+
+    private bool _diagnosing;
+
+    /// <summary>
+    /// Copies a report of what the widget sees here (no session names or
+    /// messages), for whoever helps when something does not work. Also saved
+    /// to a file, in case the clipboard is busy or the message goes by e-mail.
+    /// </summary>
+    private async void CopyDiagnostics()
+    {
+        if (_diagnosing) return;
+        _diagnosing = true;
+        try
+        {
+            var sessions = await Task.Run(SessionScanner.Scan);
+            var text = await Diagnostics.BuildAsync(new Diagnostics.Live(
+                _cfg, _limits, _hello.Ping, _hello.Running, _hello.Backoff, _hotkeyState, sessions, _alerts.Waiting().Count));
+            Directory.CreateDirectory(Paths.Dir);
+            File.WriteAllText(Diagnostics.ReportPath, text);
+
+            var copied = false;
+            // Another program can hold the clipboard for a moment.
+            for (var i = 0; i < 5 && !copied; i++)
+            {
+                try { Clipboard.SetText(text); copied = true; }
+                catch (ExternalException) { await Task.Delay(100); }
+            }
+            Log.Write($"Diagnóstico gerado{(copied ? " e copiado" : "")}.");
+            Notify(copied ? "Diagnóstico copiado" : "Diagnóstico guardado",
+                copied
+                    ? "Cola-o (Ctrl+V) numa mensagem para quem te ajuda. Não leva nomes de sessões nem mensagens."
+                    : $"Não deu para copiar. Está em {Diagnostics.ReportPath}.",
+                Forms.ToolTipIcon.Info, 6000, null);
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Falha no diagnóstico: {ex}");
+            Notify("Claude Usage", "Não deu para gerar o diagnóstico. Ver widget.log.", Forms.ToolTipIcon.Warning, 4000, null);
+        }
+        finally { _diagnosing = false; }
     }
 
     private void ToggleVisible()
@@ -599,6 +648,7 @@ public partial class MainWindow : Window
         };
         menu.Items.Add("Definições…", null, (_, _) => OpenSettings());
         menu.Items.Add("Atualizar agora", null, (_, _) => HelloNow());
+        menu.Items.Add("Copiar diagnóstico", null, (_, _) => CopyDiagnostics());
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Sair", null, (_, _) => Exit());
 

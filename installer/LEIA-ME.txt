@@ -88,6 +88,14 @@ DESINSTALAR
 
 PROBLEMAS
 ---------
+  - Algo não funciona: botão direito no widget > "Copiar diagnóstico", e cola-o
+    numa mensagem para quem te deu o widget. Diz que cópias do Claude Code o
+    widget encontrou, se o statusline e o hook estão instalados, quando
+    chegaram as últimas leituras, e as últimas linhas do registo. Não leva
+    nomes de sessões, mensagens nem valores de variáveis (só os nomes).
+    Fica também em %USERPROFILE%\.claude\usage-widget\diagnostico.txt.
+    Se o widget nem arranca, corre isto para o gerar:
+      %LOCALAPPDATA%\Programs\ClaudeUsageWidget\ClaudeUsageWidget.exe --diagnostics
   - O comando dá erro de política de execução ou o antivírus apaga o .exe:
     o PC tem regras da empresa contra programas não assinados. Fala com o IT.
   - O widget mostra "--": ainda não há leituras. Usa o Claude Code uma vez ou

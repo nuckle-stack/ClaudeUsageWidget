@@ -18,6 +18,14 @@ public partial class App : Application
             return;
         }
 
+        // "--diagnostics": write the diagnostics report to its file, then exit.
+        // For the installer when its check fails, and for a widget that won't start.
+        if (e.Args.Contains("--diagnostics"))
+        {
+            WriteDiagnosticsAndExit();
+            return;
+        }
+
         _single = new Mutex(true, "ClaudeUsageWidget.SingleInstance", out var isNew);
         if (!isNew)
         {
@@ -42,6 +50,26 @@ public partial class App : Application
         var ok = false;
         try { ok = await new AutoHello().SendAsync(Json.Load<Config>(Paths.Config)); }
         catch (Exception ex) { Log.Write($"--hello falhou: {ex}"); }
+        Shutdown(ok ? 0 : 1);
+    }
+
+    private async void WriteDiagnosticsAndExit()
+    {
+        var ok = false;
+        try
+        {
+            var cfg = Json.Load<Config>(Paths.Config);
+            var hello = new AutoHello();
+            var sessions = await Task.Run(SessionScanner.Scan);
+            // Without the widget running, nothing knows the shortcut's state or who is waiting.
+            var text = await Diagnostics.BuildAsync(new Diagnostics.Live(
+                cfg, Json.Load<Limits>(Paths.Limits), hello.Ping, false, hello.Backoff,
+                (cfg.Hotkey.Length > 0 ? cfg.Hotkey : "nenhum") + " (o widget não estava aberto)", sessions, -1));
+            System.IO.Directory.CreateDirectory(Paths.Dir);
+            System.IO.File.WriteAllText(Diagnostics.ReportPath, text);
+            ok = true;
+        }
+        catch (Exception ex) { Log.Write($"--diagnostics falhou: {ex}"); }
         Shutdown(ok ? 0 : 1);
     }
 }
