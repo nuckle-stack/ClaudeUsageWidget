@@ -49,6 +49,9 @@ USAR
   - Avisos: "terminou" avisa uma vez; "precisa de ti" relembra até 3 vezes.
     Se já estás a olhar para a janela da sessão, o aviso conta como visto.
     Clicar no aviso (enquanto está no ecrã) leva-te à sessão.
+  - Cada sessão diz o que está a fazer agora ("a editar Forecast.cs", "a correr
+    dotnet test"). Quando pede autorização, o aviso e a lista dizem para quê
+    ("precisa de ti para correr git push").
   - Ctrl+Alt+C, em qualquer programa: salta para a sessão que está à tua
     espera há mais tempo; outra vez, para a seguinte. Sem nenhuma à espera,
     abre a lista de sessões. Muda-se (ou desliga-se) nas Definições.

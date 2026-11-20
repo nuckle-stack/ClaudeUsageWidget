@@ -338,7 +338,8 @@ public partial class MainWindow : Window
         {
             var sessions = await Task.Run(SessionScanner.Scan);
             if (_cfg.Alerts.Enabled)
-                foreach (var alert in _alerts.Update(_cfg.Alerts, sessions)) Announce(alert);
+                foreach (var alert in _alerts.Update(_cfg.Alerts, sessions))
+                    Announce(alert, sessions.FirstOrDefault(s => s.SessionId == alert.SessionId));
             if (_cfg.ContextAlerts.Enabled)
                 foreach (var (title, text, session) in _context.Update(_cfg.ContextAlerts, sessions))
                 {
@@ -352,13 +353,14 @@ public partial class MainWindow : Window
         UpdatePulse();
     }
 
-    private void Announce(Alert a)
+    private void Announce(Alert a, SessionInfo? session)
     {
         var input = a.Kind == AlertKind.Input;
-        Log.Write($"Aviso ({(input ? "precisa de ti" : "terminou")}){(Quiet ? " [silenciado]" : "")}: {a.Name} — {a.Message}");
+        var text = SessionStatus.AlertText(a, session);
+        Log.Write($"Aviso ({(input ? "precisa de ti" : "terminou")}){(Quiet ? " [silenciado]" : "")}: {a.Name} — {text}");
         if (Quiet) return;
         Notify(input ? "Claude precisa de ti" : "Claude terminou",
-            $"{a.Name}\n{a.Message}",
+            $"{a.Name}\n{text}",
             input ? Forms.ToolTipIcon.Warning : Forms.ToolTipIcon.Info, 6000,
             () => GoTo(a.Pid, a.Name, a.SessionId));
         if (_cfg.Alerts.Sound)

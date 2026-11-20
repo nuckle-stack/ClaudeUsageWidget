@@ -197,29 +197,8 @@ public partial class SessionsWindow : Window
             _ => (Frozen("#3334D399"), Frozen("#6EE7B7")),
         };
 
-        var status = s.Status switch
-        {
-            "busy" => "a trabalhar",
-            "idle" => "parada",
-            "" => "—",
-            var other => other,
-        };
-        var statusBrush = s.Status == "busy" ? Yellow : Grey;
-        if (_alerts.For(s.SessionId) is { } alert)
-        {
-            (status, statusBrush) = alert.Kind == AlertKind.Input
-                ? ($"precisa de ti: {alert.Message}", Orange)
-                : ("terminou, à tua espera", Green);
-        }
-        // How long it has been in this state says more than the process age: the
-        // desktop app restarts a conversation's process whenever you reopen it.
-        if (s.StatusUpdatedAt > 0)
-        {
-            var since = Age(DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeMilliseconds(s.StatusUpdatedAt));
-            status += s.Status is "busy" or "idle" && _alerts.For(s.SessionId) is null ? $" há {since}" : $" · há {since}";
-        }
-        else if (s.StartedAt is { } started)
-            status += $" · aberta há {Age(DateTimeOffset.UtcNow - started)}";
+        var (status, tone) = SessionStatus.Line(s, _alerts.For(s.SessionId), DateTimeOffset.UtcNow);
+        var statusBrush = tone switch { Tone.Busy => Yellow, Tone.Input => Orange, Tone.Done => Green, _ => Grey };
 
         var quality = s.Quality is { } q ? $"Q {Math.Round(q)}" + (s.Grade is { } g ? $" {g}" : "") : "";
         var qBrush = s.Quality switch { null => Grey, < 50 => Red, < 70 => Yellow, _ => Green };
@@ -302,13 +281,6 @@ public partial class SessionsWindow : Window
     {
         _showHidden = !_showHidden;
         Refresh();
-    }
-
-    private static string Age(TimeSpan t)
-    {
-        if (t.TotalDays >= 1) return $"{(int)t.TotalDays}d{t.Hours:D2}h";
-        if (t.TotalHours >= 1) return $"{(int)t.TotalHours}h{t.Minutes:D2}";
-        return $"{Math.Max(1, (int)t.TotalMinutes)}m";
     }
 
     private static string ShortPath(string path)

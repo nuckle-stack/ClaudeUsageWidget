@@ -29,6 +29,9 @@ public class SessionInfo
     public long ContextTokens { get; init; }
     public long ContextSize { get; init; }
 
+    /// <summary>The tool call it is waiting on, if any: what it is doing now, or what it needs you for.</summary>
+    public Doing? Doing { get; init; }
+
     public bool IsSdk => Kind == "SDK";
 }
 
@@ -84,6 +87,7 @@ public static class SessionScanner
                     FillEstimated = ctx is { Exact: false } && pluginFill is null,
                     ContextTokens = ctx?.Tokens ?? 0,
                     ContextSize = ctx?.Size ?? 0,
+                    Doing = Transcripts.Activity(claudeDir, sessionId, cwd),
                 });
             }
             catch { }
@@ -174,6 +178,19 @@ public static class Transcripts
         public long Tokens;
         public string Model = "";
         public long AnsweredAt;
+        /// <summary>Tool calls with no result yet, by call id.</summary>
+        public readonly Dictionary<string, Doing> Pending = new();
+    }
+
+    /// <summary>The tool call the session is waiting on (the latest, when several run at once); null when none.</summary>
+    public static Doing? Activity(string claudeDir, string sessionId, string cwd)
+    {
+        if (sessionId.Length == 0) return null;
+        lock (Cache)
+        {
+            var e = Refresh(claudeDir, sessionId, cwd);
+            return e.Pending.Values.MaxBy(d => d.Since);
+        }
     }
 
     private static readonly Dictionary<string, Entry> Cache = new();
@@ -252,6 +269,7 @@ public static class Transcripts
         var text = System.Text.Encoding.UTF8.GetString(buffer, 0, end);
         foreach (var line in text.Split('\n'))
         {
+            if (e.Pending.Count > 0 && line.Contains("\"tool_result\"")) Resolve(line, e);
             if (line.Contains("\"usage\"") && line.Contains("\"assistant\""))
             {
                 ReadAnswer(line, e);
@@ -286,13 +304,27 @@ public static class Transcripts
             using var doc = JsonDocument.Parse(line);
             var root = doc.RootElement;
             if (root.ValueKind != JsonValueKind.Object || Text(root, "type") != "assistant" ||
-                !root.TryGetProperty("message", out var m) || m.ValueKind != JsonValueKind.Object ||
-                !m.TryGetProperty("usage", out var u) || u.ValueKind != JsonValueKind.Object) return;
+                !root.TryGetProperty("message", out var m) || m.ValueKind != JsonValueKind.Object) return;
+            var at = DateTimeOffset.TryParse(Text(root, "timestamp"), out var stamp) ? stamp.ToUnixTimeSeconds() : 0;
+
+            // Claude Code writes one line per block. A tool call waits for its
+            // result; thinking or text after it means the model has moved on.
+            if (m.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.Array)
+                foreach (var block in content.EnumerateArray())
+                {
+                    if (block.ValueKind != JsonValueKind.Object) continue;
+                    if (Text(block, "type") != "tool_use") { e.Pending.Clear(); continue; }
+                    if (e.Pending.Count > 20) e.Pending.Clear();   // results never seen: a cut-off session
+                    e.Pending[Text(block, "id")] = ToolActivity.Describe(Text(block, "name"),
+                        block.TryGetProperty("input", out var input) ? input : default, at);
+                }
+
+            if (!m.TryGetProperty("usage", out var u) || u.ValueKind != JsonValueKind.Object) return;
             var tokens = Count(u, "input_tokens") + Count(u, "cache_creation_input_tokens") + Count(u, "cache_read_input_tokens");
             if (tokens <= 0) return;   // e.g. "<synthetic>" error lines
             e.Tokens = tokens;
             e.Model = Text(m, "model");
-            e.AnsweredAt = DateTimeOffset.TryParse(Text(root, "timestamp"), out var at) ? at.ToUnixTimeSeconds() : 0;
+            e.AnsweredAt = at;
         }
         catch (JsonException) { }
 
@@ -300,6 +332,21 @@ public static class Transcripts
             el.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
         static long Count(JsonElement el, string name) =>
             el.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var n) ? n : 0;
+    }
+
+    /// <summary>
+    /// A user line carrying tool results: those calls are done. The ids are
+    /// read off the raw text, since a result can be megabytes of file content.
+    /// </summary>
+    private static void Resolve(string line, Entry e)
+    {
+        const string key = "\"tool_use_id\":\"";
+        for (var i = line.IndexOf(key, StringComparison.Ordinal); i >= 0; i = line.IndexOf(key, i + key.Length, StringComparison.Ordinal))
+        {
+            var start = i + key.Length;
+            var end = line.IndexOf('"', start);
+            if (end > start) e.Pending.Remove(line[start..end]);
+        }
     }
 
     /// <summary>
