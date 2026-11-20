@@ -42,24 +42,43 @@ public class SessionInfo
 /// </summary>
 public static class SessionScanner
 {
+    /// <summary>
+    /// What the last scan found in the session files, for FormatWatch: files
+    /// that are there but say nothing it knows mean Claude Code changed them.
+    /// </summary>
+    public record Health(int Files, int WithIds, int Alive, int AliveWithStatus, string Version);
+
+    public static Health LastHealth { get; private set; } = new(0, 0, 0, 0, "");
+
     public static List<SessionInfo> Scan()
     {
         var result = new List<SessionInfo>();
         var claudeDir = Path.GetDirectoryName(Paths.Dir)!;
         var dir = Path.Combine(claudeDir, "sessions");
-        if (!Directory.Exists(dir)) return result;
+        if (!Directory.Exists(dir))
+        {
+            LastHealth = new(0, 0, 0, 0, "");
+            return result;
+        }
 
+        int files = 0, withIds = 0, alive = 0, withStatus = 0;
+        var version = "";
         foreach (var file in Directory.EnumerateFiles(dir, "*.json"))
         {
             // "*.json" also matches longer extensions on Windows.
             if (!file.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) continue;
+            files++;
             try
             {
                 using var doc = JsonDocument.Parse(ReadShared(file));
                 var root = doc.RootElement;
                 if (!root.TryGetProperty("pid", out var pidEl) || !pidEl.TryGetInt32(out var pid)) continue;
+                if (Str(root, "sessionId").Length > 0) withIds++;
                 // A crashed session leaves its file behind, and the pid can be reused.
                 if (!IsAlive(pid, Long(root, "procStart"))) continue;
+                alive++;
+                if (Str(root, "status").Length > 0) withStatus++;
+                if (Newer(Str(root, "version"), version)) version = Str(root, "version");
 
                 var sessionId = Str(root, "sessionId");
                 var cwd = Str(root, "cwd");
@@ -93,6 +112,7 @@ public static class SessionScanner
             catch { }
         }
 
+        LastHealth = new(files, withIds, alive, withStatus, version);
         return result
             .OrderBy(s => s.IsSdk)
             .ThenBy(s => s.Status == "busy" ? 0 : 1)
@@ -150,8 +170,17 @@ public static class SessionScanner
     private static string Str(JsonElement e, string name) =>
         e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
 
-    private static long Long(JsonElement e, string name) =>
-        e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var n) ? n : 0;
+    /// <summary>A whole number, written as a number or as a string: procStart is a FILETIME too big for JavaScript, so it comes as text.</summary>
+    internal static long Long(JsonElement e, string name)
+    {
+        if (!e.TryGetProperty(name, out var v)) return 0;
+        if (v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var n)) return n;
+        return v.ValueKind == JsonValueKind.String && long.TryParse(v.GetString(), out var s) ? s : 0;
+    }
+
+    /// <summary>Whether version a (e.g. "2.1.329") is newer than b; anything beats empty.</summary>
+    private static bool Newer(string a, string b) =>
+        Version.TryParse(a, out var va) && (!Version.TryParse(b, out var vb) || va > vb);
 
     private static double? Num(JsonElement e, string name) =>
         e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out var n) ? n : null;

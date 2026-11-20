@@ -116,6 +116,17 @@ public class UsageLedger
     /// </summary>
     public long LastUsedAt { get { lock (_gate) return _lastUsedAt; } }
 
+    private long _bytesWithoutUsage;
+    private int _answersWithoutUsage;
+
+    /// <summary>
+    /// What was read since the last answer whose usage the ledger understood:
+    /// answers (lines of type "assistant") and bytes. Every answer carries a
+    /// usage, so a run of answers without one means Claude Code changed how
+    /// it writes them; the bytes catch a change that renames the type too.
+    /// </summary>
+    public (int Answers, long Bytes) WithoutUsage { get { lock (_gate) return (_answersWithoutUsage, _bytesWithoutUsage); } }
+
     /// <summary>Reads new transcript lines in the background, unless that was done in the last maxAge.</summary>
     public Task RefreshAsync(TimeSpan maxAge)
     {
@@ -153,8 +164,13 @@ public class UsageLedger
                     if (File.GetLastWriteTimeUtc(file) < since) continue;
                     long offset;
                     lock (_gate) offset = _offsets.GetValueOrDefault(file);
-                    var end = ReadFrom(file, offset, (id, r) => { ids.Add(id); found.Add(r); });
-                    lock (_gate) _offsets[file] = end;
+                    var (end, tailBytes, tailAnswers, any) = ReadFrom(file, offset, (id, r) => { ids.Add(id); found.Add(r); });
+                    lock (_gate)
+                    {
+                        _offsets[file] = end;
+                        _bytesWithoutUsage = any ? tailBytes : _bytesWithoutUsage + tailBytes;
+                        _answersWithoutUsage = any ? tailAnswers : _answersWithoutUsage + tailAnswers;
+                    }
                 }
                 catch { }
             }
@@ -234,7 +250,12 @@ public class UsageLedger
     /// be large), and hands over each request found. Returns the offset after
     /// the last complete line: a half-written one is read next time.
     /// </summary>
-    private static long ReadFrom(string path, long offset, Action<string, Request> onRequest)
+    /// <returns>
+    /// The offset after the last whole line; the bytes and the answers read
+    /// after the last request found (all of them when there was none); and
+    /// whether there was one.
+    /// </returns>
+    private static (long Offset, long TailBytes, int TailAnswers, bool Any) ReadFrom(string path, long offset, Action<string, Request> onRequest)
     {
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         if (fs.Length < offset) offset = 0;   // rewritten
@@ -242,6 +263,9 @@ public class UsageLedger
 
         var buffer = new byte[1 << 20];
         var pending = new MemoryStream();
+        long tail = 0;
+        var answers = 0;
+        var any = false;
         int read;
         while ((read = fs.Read(buffer, 0, buffer.Length)) > 0)
         {
@@ -258,14 +282,27 @@ public class UsageLedger
                 else line = buffer.AsSpan(start, i - start);
 
                 offset += line.Length + 1;
-                if (Parse(line) is { } r) onRequest(r.Id, r.Request);
+                if (Parse(line) is { } r)
+                {
+                    onRequest(r.Id, r.Request);
+                    (tail, answers, any) = (0, 0, true);
+                }
+                else
+                {
+                    tail += line.Length + 1;
+                    // An API error is written as an answer with no usage; it is not a format change.
+                    if (line.IndexOf(AssistantType) >= 0 && line.IndexOf(Synthetic) < 0) answers++;
+                }
                 pending.SetLength(0);
                 start = i + 1;
             }
             pending.Write(buffer, start, read - start);
         }
-        return offset;
+        return (offset, tail, answers, any);
     }
+
+    private static readonly byte[] AssistantType = "\"type\":\"assistant\""u8.ToArray();
+    private static readonly byte[] Synthetic = "<synthetic>"u8.ToArray();
 
     private static readonly byte[] UsageKey = "\"usage\""u8.ToArray();
     private static readonly byte[] AssistantKey = "\"assistant\""u8.ToArray();

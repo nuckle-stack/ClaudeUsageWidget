@@ -20,6 +20,9 @@ public class AutoHello
 
     public bool Running { get; private set; }
 
+    /// <summary>The last hello answered but without the limits, which earlier ones carried.</summary>
+    public bool LostLimits { get; private set; }
+
     /// <summary>Consecutive failed hellos, and when the next try is allowed (unix seconds).</summary>
     public (int Failures, long NextAttemptAt) Backoff => (_state.Attempts, _state.NextAttemptAt);
 
@@ -106,6 +109,8 @@ public class AutoHello
                 Json.Save(Paths.Ping, _ping);
                 _state.Attempts = 0;
                 _state.NextAttemptAt = 0;
+                LostLimits = limits is null && _state.HelloHadLimits;
+                if (limits is not null) _state.HelloHadLimits = true;
                 Log.Write(limits is null
                     ? $"Hello enviado ({used}); sem limites na resposta, a usar estimativa."
                     : $"Hello enviado ({used}); 5h {limits.FiveHour?.UsedPercentage:0}%, 7d {limits.SevenDay?.UsedPercentage:0}%.");

@@ -32,6 +32,9 @@ public static class ContextWindow
     /// <summary>A week after its last report a session is long gone; its file goes too.</summary>
     private static readonly TimeSpan KeepFor = TimeSpan.FromDays(8);
 
+    /// <summary>What the statusline last wrote for this session, if anything.</summary>
+    public static Report? Reported(string sessionId) => Reports().GetValueOrDefault(sessionId);
+
     public static ContextFill? For(string claudeDir, string sessionId, string cwd)
     {
         if (sessionId.Length == 0) return null;

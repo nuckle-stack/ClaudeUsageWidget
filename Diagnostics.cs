@@ -23,7 +23,7 @@ public static class Diagnostics
     public record Live(
         Config Config, Limits Statusline, Limits Ping, bool HelloRunning,
         (int Failures, long NextAttemptAt) Backoff, string Hotkey, List<SessionInfo> Sessions, int Waiting,
-        string Updates = "");
+        string Updates = "", string Format = "");
 
     public static readonly string ReportPath = Path.Combine(Paths.Dir, "diagnostico.txt");
 
@@ -69,6 +69,8 @@ public static class Diagnostics
         Line(vars.Count > 0
             ? $"Variáveis de ambiente (só os nomes): {string.Join(", ", vars)}"
             : "Variáveis de ambiente: nenhuma das que mudam a conta, o servidor ou a rede.");
+        if (SessionScanner.LastHealth.Version is { Length: > 0 } running) Line($"Versão nas sessões abertas: {running}");
+        Line($"Formato dos ficheiros: {(live.Format.Length > 0 ? live.Format : "não verificado (o widget não estava aberto)")}");
 
         Section("settings.json");
         foreach (var line in SettingsLines(claudeDir)) Line(line);

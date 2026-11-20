@@ -60,11 +60,16 @@ public partial class App : Application
         {
             var cfg = Json.Load<Config>(Paths.Config);
             var hello = new AutoHello();
+            var limits = Json.Load<Limits>(Paths.Limits);
+            var claudeDir = System.IO.Path.GetDirectoryName(Paths.Dir)!;
+            await UsageLedger.Shared.RefreshAsync(TimeSpan.Zero);
+            var observations = await Task.Run(() => FormatWatch.Observe(claudeDir, limits.UpdatedAt, false));
             var sessions = await Task.Run(SessionScanner.Scan);
             // Without the widget running, nothing knows the shortcut's state or who is waiting.
             var text = await Diagnostics.BuildAsync(new Diagnostics.Live(
-                cfg, Json.Load<Limits>(Paths.Limits), hello.Ping, false, hello.Backoff,
-                (cfg.Hotkey.Length > 0 ? cfg.Hotkey : "nenhum") + " (o widget não estava aberto)", sessions, -1));
+                cfg, limits, hello.Ping, false, hello.Backoff,
+                (cfg.Hotkey.Length > 0 ? cfg.Hotkey : "nenhum") + " (o widget não estava aberto)", sessions, -1,
+                Format: FormatWatch.Once(observations, DateTimeOffset.UtcNow.ToUnixTimeSeconds())));
             System.IO.Directory.CreateDirectory(Paths.Dir);
             System.IO.File.WriteAllText(Diagnostics.ReportPath, text);
             ok = true;

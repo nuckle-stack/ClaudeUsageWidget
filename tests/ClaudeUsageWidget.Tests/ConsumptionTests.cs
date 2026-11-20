@@ -222,6 +222,31 @@ public class UsageLedgerTests
     }
 
     [Fact]
+    public void Answers_whose_usage_is_understood_leave_nothing_unexplained()
+    {
+        File.WriteAllText(Transcript("p", "s1"), User + Line("m1", "s1", @"D:\p", Now - 60) + User);
+        var (answers, bytes) = Read().WithoutUsage;
+        Assert.Equal(0, answers);
+        Assert.Equal(User.Length, bytes);   // only what came after the last answer
+    }
+
+    [Fact]
+    public void Answers_in_a_format_it_does_not_know_are_counted()
+    {
+        // As if Claude Code renamed "usage": the answers are there, the ledger finds nothing in them.
+        var renamed = """{"type":"assistant","message":{"id":"m","model":"claude-opus-5-5","tokens":{"in":1}},"sessionId":"s1","timestamp":"2026-11-20T10:00:00Z"}""" + "\n";
+        var apiError = """{"type":"assistant","message":{"id":"e","model":"<synthetic>","usage":{"input_tokens":0,"output_tokens":0}},"sessionId":"s1"}""" + "\n";
+        File.WriteAllText(Transcript("p", "s1"), Line("m1", "s1", @"D:\p", Now - 60) + string.Concat(Enumerable.Repeat(renamed, 25)) + apiError);
+        var ledger = Read();
+        Assert.Equal(25, ledger.WithoutUsage.Answers);   // the API error is not one of them
+
+        // One answer understood again, and the count starts over.
+        File.AppendAllText(Transcript("p", "s1"), Line("m2", "s1", @"D:\p", Now - 10));
+        ledger.Refresh(Now);
+        Assert.Equal(0, ledger.WithoutUsage.Answers);
+    }
+
+    [Fact]
     public void Last_use_is_the_last_answer_not_the_last_write()
     {
         // An idle session appends bookkeeping lines (its title, its mode) with nobody using it.

@@ -39,11 +39,12 @@ dotnet test tests\ClaudeUsageWidget.Tests
 Cobrem a previsão do ritmo de uso e os avisos de 80/95%, o agendamento do
 auto-hello, a leitura da saída do `claude -p` (com uma linha `rate_limit_event`
 real), os títulos das sessões, os lembretes dos avisos, o consumo por projeto,
-o contexto ocupado de cada sessão (com e sem o tamanho da janela do statusline),
-o que cada sessão está a fazer (a descrição de cada ferramenta e a linha da lista),
-a parte do dia do limite semanal e o diagnóstico (incluindo o que ele não pode
-levar: nomes de sessões, valores de variáveis, a pasta do utilizador). Correm em
-menos de um segundo.
+o contexto ocupado de cada sessão (com e sem o tamanho da janela do
+statusline), o que cada sessão está a fazer, a vigia do formato dos ficheiros
+do Claude Code (cada sinal, a espera de 5 minutos, o aviso uma vez por versão),
+a parte do dia do limite semanal, as atualizações e o diagnóstico (incluindo o
+que ele não pode levar: nomes de sessões, valores de variáveis, a pasta do
+utilizador). Correm em menos de um segundo.
 
 ## Diagnóstico
 

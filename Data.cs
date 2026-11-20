@@ -212,4 +212,6 @@ public class State
     public long NextAttemptAt { get; set; }
     /// <summary>The window (its resetsAt) already pinged on reaching 100%, to learn about extra usage.</summary>
     public long FullPingFor { get; set; }
+    /// <summary>A hello on this machine once carried the limits: one without them is a change, not an API-key account.</summary>
+    public bool HelloHadLimits { get; set; }
 }

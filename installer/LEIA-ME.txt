@@ -65,6 +65,10 @@ USAR
     gastou cada projeto e cada sessão. É uma estimativa: reparte o uso do
     Claude Code neste PC pelo custo equivalente na API (o Opus pesa mais do
     que o Sonnet ou o Haiku). Não vê conversas no claude.ai nem outros PCs.
+  - O widget lê ficheiros internos do Claude Code, que podem mudar quando o
+    Claude Code se atualiza. Se deixar de os perceber, avisa uma vez ("O
+    widget deixou de perceber o Claude Code"); clicar no aviso procura uma
+    versão nova do widget.
   - Versões novas: o widget procura-as no GitHub de 6 em 6 horas e avisa uma
     vez. Clica no aviso (ou botão direito > "Instalar a versão…") para a
     instalar: o widget fecha-se e volta a abrir sozinho, com as tuas

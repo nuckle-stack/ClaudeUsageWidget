@@ -188,6 +188,7 @@ public partial class MainWindow : Window
         if (_cfg.AlwaysOnTop && !Topmost) Topmost = true;
 
         await CheckAlertsAsync();
+        await CheckFormatAsync();
 
         await _hello.CheckAsync(_cfg, _limits);
         Ingest();
@@ -322,6 +323,38 @@ public partial class MainWindow : Window
         var budget = TodayBudget();
         if (UsageHistory.BudgetText(budget) is { Length: > 0 } today) lines.Add((today, budget!.Over));
         return lines;
+    }
+
+    // ---- Claude Code's formats ---------------------------------------------
+
+    private readonly FormatWatch _format = new();
+    private DateTime _formatChecked;
+    /// <summary>The Claude Code version last seen in a session file; kept when no session is open.</summary>
+    private string _claudeVersion = "";
+
+    /// <summary>Once a minute: does the widget still understand what Claude Code writes?</summary>
+    private async Task CheckFormatAsync()
+    {
+        if (DateTime.UtcNow - _formatChecked < TimeSpan.FromMinutes(1)) return;
+        _formatChecked = DateTime.UtcNow;
+        try
+        {
+            var claudeDir = Path.GetDirectoryName(Paths.Dir)!;
+            await UsageLedger.Shared.RefreshAsync(TimeSpan.FromMinutes(1));
+            var (limitsAt, lost) = (_limits.UpdatedAt, _hello.LostLimits);
+            var observations = await Task.Run(() => FormatWatch.Observe(claudeDir, limitsAt, lost));
+            if (observations.Sessions.Version.Length > 0) _claudeVersion = observations.Sessions.Version;
+
+            var announce = _format.Update(observations, DateTimeOffset.UtcNow.ToUnixTimeSeconds(), _claudeVersion);
+            if (announce.Count == 0) return;
+
+            var text = FormatWatch.Message(announce, _claudeVersion);
+            Log.Write($"Formato do Claude Code {_claudeVersion}{(Quiet ? " [silenciado]" : "")}: {string.Join(", ", announce.Select(p => p.Key))} — {text}");
+            if (Quiet) return;
+            // A click looks for a widget that understands the new format.
+            Notify("O widget deixou de perceber o Claude Code", text, Forms.ToolTipIcon.Warning, 10000, UpdateFromMenu);
+        }
+        catch (Exception ex) { Log.Write($"Falha a verificar o formato do Claude Code: {ex.Message}"); }
     }
 
     // ---- alerts ------------------------------------------------------------
@@ -701,7 +734,7 @@ public partial class MainWindow : Window
         {
             var sessions = await Task.Run(SessionScanner.Scan);
             var text = await Diagnostics.BuildAsync(new Diagnostics.Live(
-                _cfg, _limits, _hello.Ping, _hello.Running, _hello.Backoff, _hotkeyState, sessions, _alerts.Waiting().Count, UpdateStatus()));
+                _cfg, _limits, _hello.Ping, _hello.Running, _hello.Backoff, _hotkeyState, sessions, _alerts.Waiting().Count, UpdateStatus(), _format.Status()));
             Directory.CreateDirectory(Paths.Dir);
             File.WriteAllText(Diagnostics.ReportPath, text);
 
