@@ -43,6 +43,8 @@ public partial class App : Application
         main.Show();
         // "--sessions": start with the sessions popup open.
         if (e.Args.Contains("--sessions")) Dispatcher.BeginInvoke(main.ToggleSessions);
+        // "--week": start with the weekly summary open.
+        else if (e.Args.Contains("--week")) Dispatcher.BeginInvoke(() => main.OpenWeek(showLast: false));
     }
 
     private async void SendHelloAndExit()

@@ -209,6 +209,58 @@ public partial class MainWindow : Window
             Notify(title, text, icon, 8000, OpenSessions);
             if (_cfg.Alerts.Sound) System.Media.SystemSounds.Exclamation.Play();
         }
+        CloseWeek(now);
+    }
+
+    // ---- the week ------------------------------------------------------------
+
+    private readonly WeekLog _weeks = new();
+    private WeekWindow? _weekWindow;
+    private bool _closingWeek;
+
+    /// <summary>
+    /// When the first reading of a new week comes in, sums up the week that
+    /// ended (while its readings are all still kept) and says how it went.
+    /// </summary>
+    private async void CloseWeek(long now)
+    {
+        // Checked every few seconds, so the cheap question first.
+        if (_closingWeek || _weeks.Unsummed(_history.Samples, now) == 0) return;
+        _closingWeek = true;
+        try
+        {
+            // The use by project comes from the transcripts: read what is new first.
+            await UsageLedger.Shared.RefreshAsync(TimeSpan.FromMinutes(1));
+            if (_weeks.Close(_history.Samples.ToList(), UsageLedger.Shared.Summarize, now) is not { } week) return;
+            var text = WeekReport.Message(week, _weeks.Before(week.ResetAt));
+            Log.Write($"Semana fechada{(Quiet ? " [silenciado]" : "")}: {text}");
+            if (Quiet) return;
+            Notify("Resumo da semana", text, Forms.ToolTipIcon.Info, 10000, () => OpenWeek(showLast: true));
+        }
+        catch (Exception ex) { Log.Write($"Falha no resumo da semana: {ex.Message}"); }
+        finally { _closingWeek = false; }
+    }
+
+    private void OnWeek(object sender, RoutedEventArgs e) => OpenWeek(showLast: false);
+
+    /// <summary>The week running and the one before, in a popup above the widget.</summary>
+    internal async void OpenWeek(bool showLast)
+    {
+        if (_weekWindow is not null) return;
+        if (!IsVisible) Show();
+        await UsageLedger.Shared.RefreshAsync(TimeSpan.FromSeconds(20));
+        if (_weekWindow is not null) return;
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var samples = _history.Samples.ToList();
+        var resetAt = samples.LastOrDefault(s => s.R7 > 0)?.R7 ?? 0;
+        var current = resetAt > 0 ? WeekReport.Build(samples, resetAt, UsageLedger.Shared.Summarize(resetAt - 7 * 86400, now + 1), now) : null;
+        var last = resetAt > 0 ? _weeks.Before(resetAt) : _weeks.Weeks.LastOrDefault();
+
+        _weekWindow = new WeekWindow(this, current, last, _weeks, showLast);
+        _weekWindow.Closed += (_, _) => _weekWindow = null;
+        _weekWindow.Show();
+        WindowFocus.BringToFront(new WindowInteropHelper(_weekWindow).EnsureHandle());
     }
 
     // ---- do not disturb ----------------------------------------------------
@@ -780,6 +832,7 @@ public partial class MainWindow : Window
     {
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Mostrar / esconder", null, (_, _) => ToggleVisible());
+        menu.Items.Add("Resumo da semana", null, (_, _) => OpenWeek(showLast: false));
         var goTo = new Forms.ToolStripMenuItem("Ir para a sessão à tua espera", null, (_, _) => GoToWaiting());
         menu.Items.Add(goTo);
         var quiet = new Forms.ToolStripMenuItem("Não incomodar");

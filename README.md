@@ -43,9 +43,9 @@ o contexto ocupado de cada sessão (com e sem o tamanho da janela do
 statusline), o que cada sessão está a fazer, as sessões recentes e o comando
 que as retoma, a vigia do formato dos ficheiros do Claude Code (cada sinal, a
 espera de 5 minutos, o aviso uma vez por versão), a parte do dia do limite
-semanal, as atualizações e o diagnóstico (incluindo o que ele não pode levar:
-nomes de sessões, valores de variáveis, a pasta do utilizador). Correm em menos
-de um segundo.
+semanal, o resumo de cada semana, as atualizações e o diagnóstico (incluindo o
+que ele não pode levar: nomes de sessões, valores de variáveis, a pasta do
+utilizador). Correm em menos de um segundo.
 
 ## Diagnóstico
 

@@ -73,6 +73,9 @@ public class UsageHistory
         if (_path is not null) Json.Save(_path, _file);
     }
 
+    /// <summary>All the readings kept (8 days), oldest first.</summary>
+    public IReadOnlyList<Sample> Samples => _file.Samples;
+
     /// <summary>The readings of one limit since a moment, oldest first, for the history chart.</summary>
     public List<Sparkline.Point> Series(bool fiveHour, long since) =>
         _file.Samples

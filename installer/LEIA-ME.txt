@@ -49,6 +49,10 @@ USAR
   - Avisos: "terminou" avisa uma vez; "precisa de ti" relembra até 3 vezes.
     Se já estás a olhar para a janela da sessão, o aviso conta como visto.
     Clicar no aviso (enquanto está no ecrã) leva-te à sessão.
+  - "Resumo da semana" (botão direito no widget): quanto do limite semanal
+    usaste, quanto gastou cada dia, que projetos o gastaram e quantas vezes a
+    janela de 5h esgotou; também a semana anterior. Quando a semana renova, o
+    widget mostra o resumo da que acabou.
   - "Recentes", no fim da lista de sessões: as sessões do terminal e do VS
     Code dos últimos 7 dias que já fechaste. Um clique abre um separador novo
     do Windows Terminal (ou uma consola) na pasta dela, com a conversa

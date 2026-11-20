@@ -37,6 +37,7 @@
         <Border.ContextMenu>
             <ContextMenu>
                 <MenuItem Header="Sessões ativas" Click="OnSessions"/>
+                <MenuItem Header="Resumo da semana" Click="OnWeek"/>
                 <MenuItem x:Name="GoToWaitingMenu" Header="Ir para a sessão à tua espera" Click="OnGoToWaiting"/>
                 <MenuItem x:Name="QuietMenu" Header="Não incomodar"/>
                 <MenuItem x:Name="SoundMenu" Header="Som dos avisos" IsCheckable="True" Click="OnToggleSound"/>
