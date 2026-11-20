@@ -38,7 +38,7 @@ public partial class SessionsWindow : Window
     private readonly AlertTracker _alerts;
     private static readonly Brush Orange = Frozen("#FB923C");
 
-    private readonly Func<string> _forecast;
+    private readonly Func<List<(string Line, bool Warn)>> _forecast;
 
     private readonly UsageHistory _history;
     private string _read5 = "", _read7 = "";
@@ -48,7 +48,7 @@ public partial class SessionsWindow : Window
     private bool _useWeek;
     private Breakdown _use = Breakdown.Empty;
 
-    public SessionsWindow(Window anchor, Config cfg, AlertTracker alerts, Func<string> forecast, UsageHistory history,
+    public SessionsWindow(Window anchor, Config cfg, AlertTracker alerts, Func<List<(string Line, bool Warn)>> forecast, UsageHistory history,
         Func<Limits> limits)
     {
         InitializeComponent();
@@ -90,10 +90,15 @@ public partial class SessionsWindow : Window
         _read5 = Plot(Chart5, Read5, true, now - 86400, now, _read5);
         _read7 = Plot(Chart7, Read7, false, now - 7 * 86400, now, _read7);
 
+        // One colour per line: only the lines that warn are orange.
         var forecast = _forecast();
-        Forecast.Text = forecast;
-        ForecastBox.Visibility = forecast.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
-        Forecast.Foreground = forecast.Contains("esgota") ? Orange : Grey;
+        Forecast.Inlines.Clear();
+        for (var i = 0; i < forecast.Count; i++)
+        {
+            if (i > 0) Forecast.Inlines.Add(new System.Windows.Documents.LineBreak());
+            Forecast.Inlines.Add(new System.Windows.Documents.Run(forecast[i].Line) { Foreground = forecast[i].Warn ? Orange : Grey });
+        }
+        ForecastBox.Visibility = forecast.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         Header.Text = visible == 1 ? "1 sessão ativa" : $"{visible} sessões ativas";
         Empty.Text = hidden > 0 ? "Todas as sessões estão escondidas." : "Nenhuma sessão do Claude Code ativa.";

@@ -158,6 +158,10 @@ public class UsageAlertsConfig
     public int[] Levels { get; set; } = [80, 95];
     /// <summary>Announce when the current pace would exhaust a limit before it resets.</summary>
     public bool Forecast { get; set; } = true;
+    /// <summary>Announce, once a day, when today has used more than its share of the weekly limit.</summary>
+    public bool DailyBudget { get; set; } = true;
+    /// <summary>Share the weekly limit over working days only (today always counts).</summary>
+    public bool BudgetWeekdaysOnly { get; set; } = true;
 }
 
 public class Config

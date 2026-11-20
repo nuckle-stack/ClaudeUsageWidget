@@ -64,6 +64,10 @@
         </StackPanel>
         <CheckBox x:Name="ForecastAlert" Margin="0,8,0,0"
                   Content="Avisar se o ritmo esgotar o limite antes do reset"/>
+        <CheckBox x:Name="BudgetAlert" Margin="0,8,0,0"
+                  Content="Avisar quando hoje passar a parte diária do limite semanal"/>
+        <CheckBox x:Name="BudgetWeekdays" Margin="20,6,0,0"
+                  Content="Repartir só pelos dias úteis (hoje conta sempre)"/>
         <CheckBox x:Name="ContextEnabled" Margin="0,12,0,0"
                   Content="Avisar quando o contexto de uma sessão degrada"/>
         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">

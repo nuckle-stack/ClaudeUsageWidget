@@ -179,7 +179,9 @@ public partial class MainWindow : Window
     private void Ingest()
     {
         if (!_history.Add(_hello.Current(_limits))) return;
-        foreach (var (title, text) in _history.PendingAlerts(_cfg.UsageAlerts))
+        var alerts = _history.PendingAlerts(_cfg.UsageAlerts);
+        if (_history.PendingBudgetAlert(DateTime.Now, _cfg.UsageAlerts) is { } budget) alerts.Add(budget);
+        foreach (var (title, text) in alerts)
         {
             Log.Write($"Aviso de uso{(Quiet ? " [silenciado]" : "")}: {title} — {text}");
             if (Quiet) continue;
@@ -188,13 +190,27 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>The pace lines shown in the tooltip and the sessions panel.</summary>
+    private DailyBudget? TodayBudget() => _history.Budget(DateTime.Now, _cfg.UsageAlerts.BudgetWeekdaysOnly);
+
+    /// <summary>The pace lines shown in the tooltip and the sessions panel, and today's share of the week.</summary>
     private string ForecastText()
     {
         var lines = new List<string>();
         if (_history.Describe(true) is { Length: > 0 } five) lines.Add("5h: " + five);
         if (_history.Describe(false) is { Length: > 0 } seven) lines.Add("7d: " + seven);
+        if (UsageHistory.BudgetText(TodayBudget()) is { Length: > 0 } today) lines.Add(today);
         return string.Join("\n", lines);
+    }
+
+    /// <summary>For the sessions panel: each line, and whether it warns (a limit running out, or today over its share).</summary>
+    private List<(string Line, bool Warn)> ForecastPanel()
+    {
+        var lines = new List<(string, bool)>();
+        foreach (var (fiveHour, label) in new[] { (true, "5h: "), (false, "7d: ") })
+            if (_history.Describe(fiveHour) is { Length: > 0 } pace) lines.Add((label + pace, pace.Contains("esgota")));
+        var budget = TodayBudget();
+        if (UsageHistory.BudgetText(budget) is { Length: > 0 } today) lines.Add((today, budget!.Over));
+        return lines;
     }
 
     // ---- alerts ------------------------------------------------------------
@@ -498,7 +514,7 @@ public partial class MainWindow : Window
         // Looking at the sessions is the acknowledgement: stop pulsing and reminding.
         _alerts.AckAll();
         UpdatePulse();
-        _sessions = new SessionsWindow(this, _cfg, _alerts, ForecastText, _history, () => _hello.Current(_limits));
+        _sessions = new SessionsWindow(this, _cfg, _alerts, ForecastPanel, _history, () => _hello.Current(_limits));
         _sessions.Closed += (_, _) => { _sessions = null; _sessionsClosed = DateTime.UtcNow; };
         _sessions.Show();
     }

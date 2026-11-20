@@ -28,6 +28,18 @@ public class HistoryFile
     /// <summary>The used-up window (its resetsAt) whose renewal was already announced.</summary>
     public long Renewed5 { get; set; }
     public long Renewed7 { get; set; }
+    /// <summary>The day (yyyy-MM-dd, local) whose over-budget alert was already given.</summary>
+    public string BudgetDay { get; set; } = "";
+}
+
+/// <summary>Today's slice of the weekly limit, in percentage points of it.</summary>
+/// <param name="UsedToday">Weekly usage added since local midnight.</param>
+/// <param name="Allowance">What was left at midnight, shared out over the days to the reset.</param>
+/// <param name="Days">The days that share it: today and the (working) days after it.</param>
+/// <param name="Reliable">False when there is no reading from before midnight to start from.</param>
+public record DailyBudget(double UsedToday, double Allowance, int Days, long ResetsAt, bool Reliable)
+{
+    public bool Over => UsedToday > Allowance;
 }
 
 /// <param name="ExhaustAt">When usage reaches 100% at the current pace, if that is before the reset.</param>
@@ -212,6 +224,79 @@ public class UsageHistory
         }
         if (changed) Save();
         return result;
+    }
+
+    /// <summary>
+    /// How much of the weekly limit today may take, and how much it has: what
+    /// was left at midnight shared equally over today and the days to the
+    /// reset. Null without a running weekly window.
+    /// </summary>
+    public DailyBudget? Budget(DateTime nowLocal, bool weekdaysOnly)
+    {
+        var last = _file.Samples.LastOrDefault(s => s.R7 > 0);
+        if (last is null) return null;
+        var resetsAt = last.R7;
+        var now = new DateTimeOffset(nowLocal).ToUnixTimeSeconds();
+        if (now >= resetsAt) return null;
+
+        var midnight = new DateTimeOffset(nowLocal.Date).ToUnixTimeSeconds();
+        var same = _file.Samples.Where(s => Math.Abs(s.R7 - resetsAt) <= 60).ToList();
+        var before = same.LastOrDefault(s => s.T < midnight);
+        double start;
+        var reliable = true;
+        if (before is not null) start = before.P7;
+        else if (resetsAt - 7 * 86400 >= midnight) start = 0;   // the week began today
+        else
+        {
+            // No reading from before midnight (the widget was off): the first of
+            // today is the best start there is, and it undercounts today.
+            start = same.FirstOrDefault(s => s.T >= midnight)?.P7 ?? last.P7;
+            reliable = false;
+        }
+
+        var days = DaysToShare(nowLocal, DateTimeOffset.FromUnixTimeSeconds(resetsAt).LocalDateTime, weekdaysOnly);
+        return new DailyBudget(Math.Max(0, last.P7 - start), Math.Max(0, 100 - start) / days, days, resetsAt, reliable);
+    }
+
+    /// <summary>
+    /// Today, always (it is the day being spent), then each day up to the
+    /// reset, weekends left out when asked; the reset day counts when the reset
+    /// comes after noon, leaving most of that day to work in.
+    /// </summary>
+    internal static int DaysToShare(DateTime todayLocal, DateTime resetLocal, bool weekdaysOnly)
+    {
+        var days = 1;
+        for (var d = todayLocal.Date.AddDays(1); d <= resetLocal.Date; d = d.AddDays(1))
+        {
+            if (d == resetLocal.Date && resetLocal.TimeOfDay < TimeSpan.FromHours(12)) break;
+            if (!weekdaysOnly || d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday)) days++;
+        }
+        return days;
+    }
+
+    /// <summary>"Hoje: 9% de 14% do limite semanal"; empty without a weekly window.</summary>
+    public static string BudgetText(DailyBudget? b)
+    {
+        if (b is null) return "";
+        static string P(double v) => v is > 0 and < 1 ? "<1%" : $"{Math.Round(v)}%";
+        return $"Hoje: {(b.Reliable ? "" : "≈ ")}{P(b.UsedToday)} de {P(b.Allowance)} do limite semanal";
+    }
+
+    /// <summary>Once a day, when today has taken more than its share of the week.</summary>
+    public (string Title, string Text)? PendingBudgetAlert(DateTime nowLocal, UsageAlertsConfig cfg)
+    {
+        if (!cfg.DailyBudget || Budget(nowLocal, cfg.BudgetWeekdaysOnly) is not { Reliable: true, Over: true } b) return null;
+        var day = nowLocal.ToString("yyyy-MM-dd");
+        if (_file.BudgetDay == day) return null;
+        _file.BudgetDay = day;
+        Save();
+
+        var reset = When(DateTimeOffset.FromUnixTimeSeconds(b.ResetsAt), fiveHour: false);
+        var left = b.Days - 1;
+        var rest = left > 0 ? $" O que gastares a mais sai dos próximos {left} dia{(left == 1 ? "" : "s")}." : "";
+        return ("Parte de hoje do limite semanal gasta",
+            $"Hoje já usaste {Math.Round(b.UsedToday)}% do limite semanal, mais do que os {Math.Round(b.Allowance)}% " +
+            $"que cabem por dia até ao reset ({reset}).{rest}");
     }
 
     private static (double Percent, long ResetsAt) Pick(Sample s, bool fiveHour) =>

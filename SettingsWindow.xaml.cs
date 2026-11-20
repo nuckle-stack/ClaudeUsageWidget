@@ -38,6 +38,8 @@ public partial class SettingsWindow : Window
         HotkeyBox.Text = cfg.Hotkey;
         Levels.Text = string.Join(", ", cfg.UsageAlerts.Levels);
         ForecastAlert.IsChecked = cfg.UsageAlerts.Forecast;
+        BudgetAlert.IsChecked = cfg.UsageAlerts.DailyBudget;
+        BudgetWeekdays.IsChecked = cfg.UsageAlerts.BudgetWeekdaysOnly;
         ContextEnabled.IsChecked = cfg.ContextAlerts.Enabled;
         QualityBelow.Text = cfg.ContextAlerts.QualityBelow.ToString();
         FillAbove.Text = cfg.ContextAlerts.FillAbove.ToString();
@@ -138,6 +140,8 @@ public partial class SettingsWindow : Window
             {
                 Levels = levels.Distinct().Order().ToArray(),
                 Forecast = ForecastAlert.IsChecked == true,
+                DailyBudget = BudgetAlert.IsChecked == true,
+                BudgetWeekdaysOnly = BudgetWeekdays.IsChecked == true,
             },
             Alerts = new AlertsConfig
             {
