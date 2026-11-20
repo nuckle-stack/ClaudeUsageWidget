@@ -35,9 +35,12 @@ public partial class MainWindow : Window
     private static readonly Color NormalBorder = Hex("#30FFFFFF");
     private readonly AlertTracker _alerts = new();
     private readonly ContextWatch _context = new();
+    private readonly OverageWatch _overage = new();
     private AlertKind? _pulsing;
     private SessionsWindow? _sessions;
     private DateTime _sessionsClosed;
+    /// <summary>What a click on the notification on screen does; replaced by each new one.</summary>
+    private Action? _onNotificationClick;
 
     public MainWindow()
     {
@@ -45,7 +48,12 @@ public partial class MainWindow : Window
         ApplyConfig();
         SetupTray();
 
-        SourceInitialized += (_, _) => HideFromAltTab();
+        SourceInitialized += (_, _) =>
+        {
+            HideFromAltTab();
+            HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(OnWindowMessage);
+            RegisterHotkey();
+        };
         Root.ContextMenu.Opened += (_, _) => FillQuietMenu();
         FillQuietMenu();
         Loaded += (_, _) => { PlaceWindow(); Tick(); };
@@ -66,7 +74,23 @@ public partial class MainWindow : Window
 
         await _hello.CheckAsync(_cfg, _limits);
         Ingest();
+        CheckLimitState();
         Render();
+    }
+
+    /// <summary>Paid extra usage starting, and a used-up limit coming back.</summary>
+    private void CheckLimitState()
+    {
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var alerts = _history.PendingRenewals(now).Select(a => (a.Title, a.Text, Forms.ToolTipIcon.Info)).ToList();
+        if (_overage.Check(_hello.Ping, now) is { } extra) alerts.Add((extra.Title, extra.Text, Forms.ToolTipIcon.Warning));
+        foreach (var (title, text, icon) in alerts)
+        {
+            Log.Write($"Aviso de limite{(Quiet ? " [silenciado]" : "")}: {title} — {text}");
+            if (Quiet) continue;
+            Notify(title, text, icon, 8000, OpenSessions);
+            if (_cfg.Alerts.Sound) System.Media.SystemSounds.Exclamation.Play();
+        }
     }
 
     // ---- do not disturb ----------------------------------------------------
@@ -153,7 +177,7 @@ public partial class MainWindow : Window
         {
             Log.Write($"Aviso de uso{(Quiet ? " [silenciado]" : "")}: {title} — {text}");
             if (Quiet) continue;
-            _tray.ShowBalloonTip(8000, title, text, Forms.ToolTipIcon.Warning);
+            Notify(title, text, Forms.ToolTipIcon.Warning, 8000, OpenSessions);
             if (_cfg.Alerts.Sound) System.Media.SystemSounds.Exclamation.Play();
         }
     }
@@ -183,11 +207,11 @@ public partial class MainWindow : Window
             if (_cfg.Alerts.Enabled)
                 foreach (var alert in _alerts.Update(_cfg.Alerts, sessions)) Announce(alert);
             if (_cfg.ContextAlerts.Enabled)
-                foreach (var (title, text) in _context.Update(_cfg.ContextAlerts, sessions))
+                foreach (var (title, text, session) in _context.Update(_cfg.ContextAlerts, sessions))
                 {
                     Log.Write($"Aviso de contexto{(Quiet ? " [silenciado]" : "")}: {title} — {text.Replace("\n", " — ")}");
                     if (Quiet) continue;
-                    _tray.ShowBalloonTip(8000, title, text, Forms.ToolTipIcon.Warning);
+                    Notify(title, text, Forms.ToolTipIcon.Warning, 8000, () => GoTo(session.Pid, session.Name, session.SessionId));
                     if (_cfg.Alerts.Sound) System.Media.SystemSounds.Exclamation.Play();
                 }
         }
@@ -200,13 +224,99 @@ public partial class MainWindow : Window
         var input = a.Kind == AlertKind.Input;
         Log.Write($"Aviso ({(input ? "precisa de ti" : "terminou")}){(Quiet ? " [silenciado]" : "")}: {a.Name} — {a.Message}");
         if (Quiet) return;
-        _tray.ShowBalloonTip(6000,
-            input ? "Claude precisa de ti" : "Claude terminou",
+        Notify(input ? "Claude precisa de ti" : "Claude terminou",
             $"{a.Name}\n{a.Message}",
-            input ? Forms.ToolTipIcon.Warning : Forms.ToolTipIcon.Info);
+            input ? Forms.ToolTipIcon.Warning : Forms.ToolTipIcon.Info, 6000,
+            () => GoTo(a.Pid, a.Name, a.SessionId));
         if (_cfg.Alerts.Sound)
             (input ? System.Media.SystemSounds.Exclamation : System.Media.SystemSounds.Asterisk).Play();
     }
+
+    /// <summary>Shows a notification; a click on it while it is on screen runs onClick.</summary>
+    private void Notify(string title, string text, Forms.ToolTipIcon icon, int ms, Action? onClick)
+    {
+        // Notifications don't say which one was clicked, so keep only the
+        // latest's action: it is the one on screen.
+        _onNotificationClick = onClick;
+        _tray.ShowBalloonTip(ms, title, text, icon);
+    }
+
+    /// <summary>Brings a session's window to the front, and counts its alert as seen.</summary>
+    private void GoTo(int pid, string name, string sessionId)
+    {
+        var host = WindowFocus.Focus(pid, name);
+        Log.Write(host is null ? $"Foco: janela da sessão \"{name}\" não encontrada." : $"Foco: sessão \"{name}\" em {host}.");
+        if (host is null) { OpenSessions(); return; }
+        _alerts.Ack(sessionId);
+        UpdatePulse();
+        Render();
+    }
+
+    /// <summary>
+    /// The global shortcut: to the session waiting for you longest (input
+    /// before finished tasks); pressed again, to the next one. With nobody
+    /// waiting, it opens the sessions list.
+    /// </summary>
+    private void GoToWaiting()
+    {
+        var waiting = _alerts.Waiting();
+        // The one already in front has been seen: move on to the next.
+        var next = waiting.FirstOrDefault(a => !WindowFocus.IsForeground(a.Pid, a.Name));
+        if (next is not null) GoTo(next.Pid, next.Name, next.SessionId);
+        else if (waiting.Count == 0) OpenSessions();
+    }
+
+    /// <summary>Opens the sessions list in front, even when asked from outside the widget.</summary>
+    private void OpenSessions()
+    {
+        if (!IsVisible) Show();
+        ToggleSessions();
+        if (_sessions is not null) WindowFocus.BringToFront(new WindowInteropHelper(_sessions).EnsureHandle());
+    }
+
+    // ---- global shortcut ---------------------------------------------------
+
+    private const int HotkeyId = 0xC1A;
+    private const int WM_HOTKEY = 0x0312;
+    private const uint MOD_NOREPEAT = 0x4000;
+
+    private IntPtr OnWindowMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_HOTKEY && wParam.ToInt32() == HotkeyId)
+        {
+            handled = true;
+            GoToWaiting();
+        }
+        return IntPtr.Zero;
+    }
+
+    /// <summary>(Re)registers the configured shortcut; says so once if another program has it.</summary>
+    private void RegisterHotkey()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        UnregisterHotKey(hwnd, HotkeyId);
+        GoToWaitingMenu.InputGestureText = "";
+        if (string.IsNullOrWhiteSpace(_cfg.Hotkey)) return;
+
+        if (!Hotkey.TryParse(_cfg.Hotkey, out var mods, out var vk))
+        {
+            Log.Write($"Atalho inválido nas definições: \"{_cfg.Hotkey}\".");
+            return;
+        }
+        var name = Hotkey.Format(mods, vk);
+        if (!RegisterHotKey(hwnd, HotkeyId, mods | MOD_NOREPEAT, vk))
+        {
+            Log.Write($"Atalho {name} já está a ser usado por outro programa.");
+            Notify("Claude Usage", $"O atalho {name} já está a ser usado por outro programa. Escolhe outro nas Definições.",
+                Forms.ToolTipIcon.Warning, 6000, OpenSettings);
+            return;
+        }
+        GoToWaitingMenu.InputGestureText = name;
+    }
+
+    [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint vk);
+    [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
     /// <summary>Pulses the widget while an alert is unanswered: amber for input, green for done.</summary>
     private void UpdatePulse()
@@ -255,6 +365,15 @@ public partial class MainWindow : Window
         }
 
         var tip = $"Claude Code\n5h: {t5}\n7d: {t7}";
+        // Near the top: the tray cuts its tooltip at 127 characters.
+        if (_hello.Ping.Overage?.ActiveAt(DateTimeOffset.UtcNow.ToUnixTimeSeconds()) == true) tip += "\nUso extra pago: ativo";
+        var waiting = _alerts.Waiting();
+        if (waiting.Count > 0)
+        {
+            var oldest = waiting.Min(a => a.RaisedAt);
+            var since = DateTime.UtcNow - oldest;
+            tip += $"\nÀ tua espera: {waiting.Count}" + (since.TotalMinutes >= 1 ? $" (há {FormatLeft(since)})" : "");
+        }
         if (ForecastText() is { Length: > 0 } forecast) tip += "\nRitmo\n" + forecast;
         var quiet = Quiet;
         QuietIcon.Visibility = quiet ? Visibility.Visible : Visibility.Collapsed;
@@ -395,6 +514,7 @@ public partial class MainWindow : Window
     // ---- commands ----------------------------------------------------------
 
     private void OnSessions(object sender, RoutedEventArgs e) => ToggleSessions();
+    private void OnGoToWaiting(object sender, RoutedEventArgs e) => GoToWaiting();
     private void OnSettings(object sender, RoutedEventArgs e) => OpenSettings();
     private void OnHelloNow(object sender, RoutedEventArgs e) => HelloNow();
     private void OnHide(object sender, RoutedEventArgs e) => Hide();
@@ -407,6 +527,7 @@ public partial class MainWindow : Window
         _cfg = dlg.Result;
         Json.Save(Paths.Config, _cfg);
         ApplyConfig();
+        RegisterHotkey();
         Render();
     }
 
@@ -417,9 +538,9 @@ public partial class MainWindow : Window
         Render();
         var ok = await task;
         Render();
-        _tray.ShowBalloonTip(4000, "Claude Usage",
+        Notify("Claude Usage",
             ok ? "Limites atualizados." : "Atualização falhou. Ver widget.log.",
-            ok ? Forms.ToolTipIcon.Info : Forms.ToolTipIcon.Warning);
+            ok ? Forms.ToolTipIcon.Info : Forms.ToolTipIcon.Warning, 4000, null);
     }
 
     private void ToggleVisible()
@@ -442,11 +563,18 @@ public partial class MainWindow : Window
     {
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Mostrar / esconder", null, (_, _) => ToggleVisible());
+        var goTo = new Forms.ToolStripMenuItem("Ir para a sessão à tua espera", null, (_, _) => GoToWaiting());
+        menu.Items.Add(goTo);
         var quiet = new Forms.ToolStripMenuItem("Não incomodar");
         menu.Items.Add(quiet);
         var sound = new Forms.ToolStripMenuItem("Som dos avisos", null, (_, _) => ToggleSound());
         menu.Items.Add(sound);
-        menu.Opening += (_, _) => { FillQuietTray(quiet); sound.Checked = _cfg.Alerts.Sound; };
+        menu.Opening += (_, _) =>
+        {
+            FillQuietTray(quiet);
+            sound.Checked = _cfg.Alerts.Sound;
+            goTo.ShortcutKeyDisplayString = GoToWaitingMenu.InputGestureText;
+        };
         menu.Items.Add("Definições…", null, (_, _) => OpenSettings());
         menu.Items.Add("Atualizar agora", null, (_, _) => HelloNow());
         menu.Items.Add(new Forms.ToolStripSeparator());
@@ -457,6 +585,13 @@ public partial class MainWindow : Window
         _tray.Text = "Claude Usage";
         _tray.Visible = true;
         _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) ToggleVisible(); };
+        // Only fires while the notification is on screen, not from the notification centre later.
+        _tray.BalloonTipClicked += (_, _) =>
+        {
+            var click = _onNotificationClick;
+            _onNotificationClick = null;
+            click?.Invoke();
+        };
     }
 
     private Drawing.Icon IconFor(string level)

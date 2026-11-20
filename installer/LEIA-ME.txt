@@ -48,6 +48,12 @@ USAR
   - Também há um ícone na área de notificação, junto ao relógio.
   - Avisos: "terminou" avisa uma vez; "precisa de ti" relembra até 3 vezes.
     Se já estás a olhar para a janela da sessão, o aviso conta como visto.
+    Clicar no aviso (enquanto está no ecrã) leva-te à sessão.
+  - Ctrl+Alt+C, em qualquer programa: salta para a sessão que está à tua
+    espera há mais tempo; outra vez, para a seguinte. Sem nenhuma à espera,
+    abre a lista de sessões. Muda-se (ou desliga-se) nas Definições.
+  - Se um limite esgotar e o Claude continuar com uso extra (pago à parte),
+    o widget avisa. Quando um limite esgotado renova, também avisa.
 
   Qualidade do contexto (opcional): se tiveres o plugin "token-optimizer" do
   Claude Code, cada sessão mostra também a qualidade e a ocupação do contexto

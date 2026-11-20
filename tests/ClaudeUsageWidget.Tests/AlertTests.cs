@@ -98,6 +98,38 @@ public class AlertTests
         Assert.Null(_tracker.Pending);
     }
 
+    private static SessionInfo Other(string id, string status, long stampMs) =>
+        new() { Pid = 0, SessionId = id, Name = id, Kind = "CLI", Status = status, StatusUpdatedAt = stampMs };
+
+    [Fact]
+    public void Waiting_lists_unseen_input_first_then_the_longest_waiting()
+    {
+        // a: finished first; b: finished later; c: needs input, last of all.
+        const long t = 1_795_000_000_000;
+        _tracker.Update(_cfg, [Other("a", "busy", t), Other("b", "busy", t), Other("c", "idle", t)]);
+        After(TimeSpan.FromMinutes(1), [Other("a", "idle", t + 60_000), Other("b", "busy", t), Other("c", "idle", t)]);
+        After(TimeSpan.FromMinutes(1), [Other("a", "idle", t + 60_000), Other("b", "idle", t + 120_000), Other("c", "idle", t)]);
+        After(TimeSpan.FromMinutes(1), [Other("a", "idle", t + 60_000), Other("b", "idle", t + 120_000), Other("c", "waiting", t + 180_000)]);
+
+        Assert.Equal(["c", "a", "b"], _tracker.Waiting().Select(a => a.SessionId));
+
+        // Seen ones go to the back, still listed: the session is still waiting.
+        _tracker.Ack("c");
+        Assert.Equal(["a", "b", "c"], _tracker.Waiting().Select(a => a.SessionId));
+        Assert.Equal(AlertKind.Done, _tracker.Pending);
+    }
+
+    [Fact]
+    public void An_alert_knows_its_process_and_when_it_came()
+    {
+        _tracker.Update(_cfg, [new SessionInfo { Pid = 4321, SessionId = _id, Name = "x", Kind = "CLI", Status = "idle" }]);
+        After(TimeSpan.FromSeconds(5), [new SessionInfo { Pid = 4321, SessionId = _id, Name = "x", Kind = "CLI", Status = "waiting", StatusUpdatedAt = 1 }]);
+
+        var alert = Assert.Single(_tracker.Waiting());
+        Assert.Equal(4321, alert.Pid);
+        Assert.Equal(_now, alert.RaisedAt);
+    }
+
     [Fact]
     public void Nothing_is_announced_on_the_first_scan()
     {

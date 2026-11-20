@@ -9,8 +9,12 @@ public enum AlertKind { Done, Input }
 public class Alert
 {
     public string SessionId { get; init; } = "";
+    /// <summary>The session's process, to bring its window to the front.</summary>
+    public int Pid { get; init; }
     public string Name { get; init; } = "";
     public AlertKind Kind { get; init; }
+    /// <summary>When the widget raised it: how long the session has been waiting for you.</summary>
+    public DateTime RaisedAt { get; init; }
     public string Message { get; init; } = "";
     /// <summary>The session's statusUpdatedAt when the alert was raised.</summary>
     public long StatusStamp { get; init; }
@@ -31,9 +35,10 @@ public class ContextWatch
     private readonly HashSet<string> _lowQuality = new();
     private readonly HashSet<string> _nearlyFull = new();
 
-    public List<(string Title, string Text)> Update(ContextAlertsConfig cfg, List<SessionInfo> sessions)
+    /// <summary>New context alerts, each with its session (to go to it when the alert is clicked).</summary>
+    public List<(string Title, string Text, SessionInfo Session)> Update(ContextAlertsConfig cfg, List<SessionInfo> sessions)
     {
-        var result = new List<(string, string)>();
+        var result = new List<(string, string, SessionInfo)>();
         var live = sessions.Where(s => !s.IsSdk && s.SessionId.Length > 0).ToList();
 
         foreach (var s in live)
@@ -42,13 +47,13 @@ public class ContextWatch
             if (!low) _lowQuality.Remove(s.SessionId);
             else if (_lowQuality.Add(s.SessionId))
                 result.Add(("Contexto degradado",
-                    $"{s.Name}\nQualidade {Math.Round(s.Quality!.Value)}. Compacta ou abre uma sessão nova."));
+                    $"{s.Name}\nQualidade {Math.Round(s.Quality!.Value)}. Compacta ou abre uma sessão nova.", s));
 
             var full = cfg.FillAbove > 0 && s.FillPct is { } f && f >= cfg.FillAbove;
             if (!full) _nearlyFull.Remove(s.SessionId);
             else if (_nearlyFull.Add(s.SessionId))
                 result.Add(("Contexto quase cheio",
-                    $"{s.Name}\n{Math.Round(s.FillPct!.Value)}% ocupado. Compacta ou abre uma sessão nova."));
+                    $"{s.Name}\n{Math.Round(s.FillPct!.Value)}% ocupado. Compacta ou abre uma sessão nova.", s));
         }
 
         var ids = live.Select(s => s.SessionId).ToHashSet();
@@ -94,6 +99,23 @@ public class AlertTracker
     {
         foreach (var a in _alerts.Values) a.Acked = true;
     }
+
+    public void Ack(string sessionId)
+    {
+        if (_alerts.TryGetValue(sessionId, out var a)) a.Acked = true;
+    }
+
+    /// <summary>
+    /// The sessions waiting for you, the one to go to first: not yet seen
+    /// before seen, needing input before finished, then the longest waiting.
+    /// An alert stays here, seen or not, until its session moves on.
+    /// </summary>
+    public List<Alert> Waiting() =>
+        _alerts.Values
+            .OrderBy(a => a.Acked)
+            .ThenBy(a => a.Kind == AlertKind.Input ? 0 : 1)
+            .ThenBy(a => a.RaisedAt)
+            .ToList();
 
     public void Clear() => _alerts.Clear();
 
@@ -184,10 +206,12 @@ public class AlertTracker
         _alerts[s.SessionId] = new Alert
         {
             SessionId = s.SessionId,
+            Pid = s.Pid,
             Name = s.Name,
             Kind = kind,
             Message = message,
             StatusStamp = s.StatusUpdatedAt,
+            RaisedAt = Clock(),
         };
     }
 
@@ -238,4 +262,31 @@ public class AlertTracker
         seconds >= 3600 ? $"{seconds / 3600}h{seconds % 3600 / 60:D2}"
         : seconds >= 60 ? $"{seconds / 60} min"
         : $"{seconds} s";
+}
+
+/// <summary>
+/// Announces, once per used-up window, that Claude has gone on with paid
+/// extra usage. Only a hello's output carries that state.
+/// </summary>
+public class OverageWatch
+{
+    private long _announced;
+
+    /// <summary>The alert to show now, or null.</summary>
+    public (string Title, string Text)? Check(Limits ping, long now)
+    {
+        if (ping.Overage is not { } o || !o.ActiveAt(now) || _announced == o.ResetsAt) return null;
+        _announced = o.ResetsAt;
+
+        var weekly = o.LimitType.StartsWith("seven_day", StringComparison.Ordinal);
+        var limit = o.LimitType switch
+        {
+            "five_hour" => "O limite de 5 horas",
+            _ when weekly => "O limite semanal",
+            _ => "Um limite de utilização",
+        };
+        var until = UsageHistory.When(DateTimeOffset.FromUnixTimeSeconds(o.ResetsAt), fiveHour: !weekly);
+        return ("Uso extra pago ativo",
+            $"{limit} esgotou e o Claude continua com uso extra, cobrado à parte. Volta ao normal {until}.");
+    }
 }

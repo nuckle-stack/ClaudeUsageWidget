@@ -65,6 +65,10 @@ public partial class SessionsWindow : Window
         ForgetStaleHides(all);
         var listed = _cfg.ShowSdkSessions ? all : all.Where(s => !s.IsSdk).ToList();
         var hidden = listed.Count(IsHidden);
+        // Sessions waiting for you first, in the order the shortcut visits them;
+        // the rest keep the scanner's order (working first, then newest).
+        var order = _alerts.Waiting().Select((a, i) => (a.SessionId, i)).ToDictionary(x => x.SessionId, x => x.i);
+        listed = listed.OrderBy(s => order.GetValueOrDefault(s.SessionId, int.MaxValue)).ToList();
         var shown = _showHidden ? listed : listed.Where(s => !IsHidden(s)).ToList();
         var visible = listed.Count - hidden;
 

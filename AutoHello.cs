@@ -22,6 +22,9 @@ public class AutoHello
 
     public bool Running { get; private set; }
 
+    /// <summary>The last hello's reading: the only one that says whether extra usage is on.</summary>
+    public Limits Ping => _ping;
+
     /// <summary>The freshest limits: the statusline feed or the last ping.</summary>
     public Limits Current(Limits statusline) =>
         statusline.UpdatedAt >= _ping.UpdatedAt ? statusline : _ping;
@@ -45,10 +48,22 @@ public class AutoHello
             return;
         }
 
+        if (cfg.RefreshMinutes <= 0) return;
+
+        // A limit just reached 100%: from here Claude either stops or goes on
+        // with paid extra usage, and only the CLI's own output says which. Ask
+        // once per window, straight away, rather than at the next refresh.
+        if (FullWindow(cur) is { } full && full != _state.FullPingFor && _ping.UpdatedAt < cur.UpdatedAt)
+        {
+            _state.FullPingFor = full;
+            await SendAsync(cfg);
+            return;
+        }
+
         // Refresh the numbers: only when Claude has been used since the last
         // reading, so an idle machine sends nothing and a ping never opens a
         // window the user did not already open.
-        if (cfg.RefreshMinutes <= 0 || now - cur.UpdatedAt < cfg.RefreshMinutes * 60L) return;
+        if (now - cur.UpdatedAt < cfg.RefreshMinutes * 60L) return;
         var activity = await LastActivityAsync();
         if (activity > cur.UpdatedAt && now - activity < WindowSeconds)
             await SendAsync(cfg);
@@ -104,6 +119,15 @@ public class AutoHello
             return ok;
         }
         finally { Running = false; }
+    }
+
+    /// <summary>The reset of a still-running window that is used up, or null.</summary>
+    public static long? FullWindow(Limits cur)
+    {
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        foreach (var w in new[] { cur.FiveHour, cur.SevenDay })
+            if (w is { UsedPercentage: >= 100, ResetsAt: { } r } && r > now) return r;
+        return null;
     }
 
     /// <summary>Whether to open a new window now, given that the last one (ending at resetsAt) has expired.</summary>
@@ -333,7 +357,9 @@ public class AutoHello
 
     /// <summary>
     /// Reads the last rate_limit_event of a stream-json run:
-    /// rate_limit_info.unifiedWindows.{five_hour,seven_day}.{utilization 0..1, resetsAt}.
+    /// rate_limit_info.unifiedWindows.{five_hour,seven_day}.{utilization 0..1, resetsAt},
+    /// and the extra-usage state beside them (isUsingOverage, overageStatus,
+    /// rateLimitType and resetsAt of the binding limit).
     /// </summary>
     public static Limits? ParseLimits(string output)
     {
@@ -346,12 +372,27 @@ public class AutoHello
                 using var doc = JsonDocument.Parse(line);
                 if (!doc.RootElement.TryGetProperty("rate_limit_info", out var info) ||
                     !info.TryGetProperty("unifiedWindows", out var windows)) continue;
-                var limits = new Limits { FiveHour = Window(windows, "five_hour"), SevenDay = Window(windows, "seven_day") };
+                var limits = new Limits
+                {
+                    FiveHour = Window(windows, "five_hour"),
+                    SevenDay = Window(windows, "seven_day"),
+                    Overage = new OverageInfo
+                    {
+                        Using = info.TryGetProperty("isUsingOverage", out var u) && u.ValueKind == JsonValueKind.True,
+                        Status = Text(info, "overageStatus"),
+                        LimitType = Text(info, "rateLimitType"),
+                        ResetsAt = info.TryGetProperty("resetsAt", out var r) && r.TryGetInt64(out var at) ? at : 0,
+                    },
+                };
                 if (limits.FiveHour is not null) found = limits;
             }
             catch (JsonException) { }
+            catch (InvalidOperationException) { }   // a field of an unexpected type
         }
         return found;
+
+        static string Text(JsonElement e, string name) =>
+            e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
 
         static LimitWindow? Window(JsonElement windows, string name)
         {

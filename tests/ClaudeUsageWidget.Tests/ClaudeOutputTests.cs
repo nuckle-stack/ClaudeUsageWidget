@@ -25,6 +25,32 @@ public class ClaudeOutputTests
     }
 
     [Fact]
+    public void ParseLimits_reads_the_extra_usage_state()
+    {
+        var o = AutoHello.ParseLimits(RateLimitEvent)!.Overage!;
+        Assert.False(o.Using);
+        Assert.Equal("allowed", o.Status);
+        Assert.Equal("five_hour", o.LimitType);
+        Assert.Equal(1795137600, o.ResetsAt);
+
+        var paying = AutoHello.ParseLimits(RateLimitEvent.Replace("\"isUsingOverage\":false", "\"isUsingOverage\":true"))!;
+        Assert.True(paying.Overage!.Using);
+        Assert.True(paying.Overage.ActiveAt(1795137600 - 1));
+        Assert.False(paying.Overage.ActiveAt(1795137600));
+    }
+
+    [Fact]
+    public void ParseLimits_survives_odd_extra_usage_fields()
+    {
+        var odd = RateLimitEvent.Replace("\"isUsingOverage\":false", "\"isUsingOverage\":\"yes\"")
+                                .Replace("\"rateLimitType\":\"five_hour\"", "\"rateLimitType\":5");
+        var limits = AutoHello.ParseLimits(odd)!;
+        Assert.False(limits.Overage!.Using);
+        Assert.Equal("", limits.Overage.LimitType);
+        Assert.Equal(7, limits.FiveHour!.UsedPercentage!.Value, precision: 6);
+    }
+
+    [Fact]
     public void ParseLimits_takes_the_last_event()
     {
         var later = RateLimitEvent.Replace("\"utilization\":0.07", "\"utilization\":0.08");

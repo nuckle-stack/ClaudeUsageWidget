@@ -95,6 +95,25 @@ public class Limits
     [JsonPropertyName("seven_day")] public LimitWindow? SevenDay { get; set; }
     /// <summary>True when the 5-hour window is a guess, not a reported value.</summary>
     [JsonPropertyName("estimated")] public bool Estimated { get; set; }
+    /// <summary>Paid extra usage, as the CLI reports it on a hello. The statusline never carries it.</summary>
+    [JsonPropertyName("overage")] public OverageInfo? Overage { get; set; }
+}
+
+/// <summary>
+/// From a hello's rate_limit_event: whether Claude is going on past a used-up
+/// limit with extra usage, billed apart from the subscription.
+/// </summary>
+public class OverageInfo
+{
+    [JsonPropertyName("using")] public bool Using { get; set; }
+    /// <summary>The account's extra-usage status, e.g. "allowed".</summary>
+    [JsonPropertyName("status")] public string Status { get; set; } = "";
+    /// <summary>The limit that is binding: "five_hour", "seven_day"...</summary>
+    [JsonPropertyName("limit_type")] public string LimitType { get; set; } = "";
+    /// <summary>When that limit resets, which ends the extra usage (unix seconds).</summary>
+    [JsonPropertyName("resets_at")] public long ResetsAt { get; set; }
+
+    public bool ActiveAt(long now) => Using && ResetsAt > now;
 }
 
 public class AutoHelloConfig
@@ -176,6 +195,8 @@ public class Config
     public double? Left { get; set; }
     public double? Top { get; set; }
     public string ClaudePath { get; set; } = "claude";
+    /// <summary>System-wide shortcut to the session waiting for you, e.g. "Ctrl+Alt+C". Empty = none.</summary>
+    public string Hotkey { get; set; } = "Ctrl+Alt+C";
 }
 
 public class State
@@ -183,4 +204,6 @@ public class State
     /// <summary>Consecutive failed hellos; drives the retry backoff.</summary>
     public int Attempts { get; set; }
     public long NextAttemptAt { get; set; }
+    /// <summary>The window (its resetsAt) already pinged on reaching 100%, to learn about extra usage.</summary>
+    public long FullPingFor { get; set; }
 }

@@ -52,6 +52,11 @@
                      ToolTip="Só para sessões à espera de ti (permissões, perguntas), no máximo 3 vezes. Tarefas concluídas avisam uma só vez."/>
             <TextBlock Text="min (0 = só uma vez)" VerticalAlignment="Center"/>
         </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock Text="Atalho para a sessão à tua espera" VerticalAlignment="Center"/>
+            <TextBox x:Name="HotkeyBox" Width="90" Margin="8,0" TextAlignment="Center"
+                     ToolTip="Em qualquer programa, salta para a sessão que espera há mais tempo; outra vez, para a seguinte. Ex. Ctrl+Alt+C. Vazio = sem atalho."/>
+        </StackPanel>
         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
             <TextBlock Text="Avisar de uso aos" VerticalAlignment="Center"/>
             <TextBox x:Name="Levels" Width="70" Margin="8,0" TextAlignment="Center"/>

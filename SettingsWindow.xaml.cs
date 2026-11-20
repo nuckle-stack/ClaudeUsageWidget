@@ -35,6 +35,7 @@ public partial class SettingsWindow : Window
         AlertsSound.IsChecked = cfg.Alerts.Sound;
         MinTask.Text = cfg.Alerts.MinTaskSeconds.ToString();
         Remind.Text = cfg.Alerts.RemindMinutes.ToString();
+        HotkeyBox.Text = cfg.Hotkey;
         Levels.Text = string.Join(", ", cfg.UsageAlerts.Levels);
         ForecastAlert.IsChecked = cfg.UsageAlerts.Forecast;
         ContextEnabled.IsChecked = cfg.ContextAlerts.Enabled;
@@ -86,6 +87,17 @@ public partial class SettingsWindow : Window
         {
             Fail("Avisos: segundos e minutos têm de ser números a partir de 0.");
             return;
+        }
+
+        var hotkey = "";
+        if (!string.IsNullOrWhiteSpace(HotkeyBox.Text))
+        {
+            if (!Hotkey.TryParse(HotkeyBox.Text, out var mods, out var vk))
+            {
+                Fail("Atalho: teclas modificadoras e uma tecla, por exemplo Ctrl+Alt+C ou Ctrl+Shift+F9 (vazio = sem atalho).");
+                return;
+            }
+            hotkey = Hotkey.Format(mods, vk);
         }
 
         var levels = new List<int>();
@@ -155,6 +167,7 @@ public partial class SettingsWindow : Window
             Left = _original.Left,
             Top = _original.Top,
             ClaudePath = _original.ClaudePath,
+            Hotkey = hotkey,
         };
 
         SetAutoStart(AutoStart.IsChecked == true);

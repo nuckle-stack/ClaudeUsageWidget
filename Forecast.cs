@@ -25,6 +25,9 @@ public class HistoryFile
     public List<Sample> Samples { get; set; } = new();
     public AlertMark Mark5 { get; set; } = new();
     public AlertMark Mark7 { get; set; } = new();
+    /// <summary>The used-up window (its resetsAt) whose renewal was already announced.</summary>
+    public long Renewed5 { get; set; }
+    public long Renewed7 { get; set; }
 }
 
 /// <param name="ExhaustAt">When usage reaches 100% at the current pace, if that is before the reset.</param>
@@ -183,10 +186,38 @@ public class UsageHistory
         return result;
     }
 
+    /// <summary>
+    /// A used-up limit (seen at 100%) that has just reset: you were blocked, or
+    /// paying for extra usage, and no longer are. Said once per window, and only
+    /// within an hour of the reset; a widget started long after it stays quiet.
+    /// </summary>
+    public List<(string Title, string Text)> PendingRenewals(long now)
+    {
+        var result = new List<(string, string)>();
+        var changed = false;
+        foreach (var fiveHour in new[] { true, false })
+        {
+            // The latest window that reached 100% (rounding can leave it a hair short).
+            var full = _file.Samples.LastOrDefault(s => Pick(s, fiveHour).ResetsAt > 0 && Pick(s, fiveHour).Percent >= 99.5);
+            if (full is null) continue;
+            var resetsAt = Pick(full, fiveHour).ResetsAt;
+            var announced = fiveHour ? _file.Renewed5 : _file.Renewed7;
+            if (now < resetsAt || announced == resetsAt) continue;
+
+            if (fiveHour) _file.Renewed5 = resetsAt; else _file.Renewed7 = resetsAt;
+            changed = true;
+            if (now - resetsAt > 3600) continue;
+            result.Add((fiveHour ? "Limite de 5 horas renovado" : "Limite semanal renovado",
+                "Já podes voltar a usar o Claude normalmente."));
+        }
+        if (changed) Save();
+        return result;
+    }
+
     private static (double Percent, long ResetsAt) Pick(Sample s, bool fiveHour) =>
         fiveHour ? (s.P5, s.R5) : (s.P7, s.R7);
 
-    private static string When(DateTimeOffset at, bool fiveHour)
+    internal static string When(DateTimeOffset at, bool fiveHour)
     {
         var local = at.LocalDateTime;
         return fiveHour || local.Date == DateTime.Today

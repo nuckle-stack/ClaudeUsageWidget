@@ -32,12 +32,27 @@ public static class WindowFocus
                 var hwnd = windows.FirstOrDefault(w => SameTitle(Caption(w), title));
                 if (hwnd == IntPtr.Zero) hwnd = SelectTab(windows, title);
                 if (hwnd == IntPtr.Zero) hwnd = p.MainWindowHandle != IntPtr.Zero ? p.MainWindowHandle : windows[0];
-                if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
-                SetForegroundWindow(hwnd);
+                BringToFront(hwnd);
                 return p.ProcessName;
             }
         }
         return null;
+    }
+
+    /// <summary>
+    /// Restores and activates a window. Windows lets a program take the
+    /// foreground only right after its own input: a click on the widget counts,
+    /// a click on its notification or a global shortcut may not. When the
+    /// request is refused, a tap of Alt (input of our own) unlocks it.
+    /// </summary>
+    internal static void BringToFront(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return;
+        if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
+        if (SetForegroundWindow(hwnd) && GetForegroundWindow() == hwnd) return;
+        keybd_event(VK_MENU, 0, KEYEVENTF_EXTENDEDKEY, UIntPtr.Zero);
+        keybd_event(VK_MENU, 0, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, UIntPtr.Zero);
+        SetForegroundWindow(hwnd);
     }
 
     /// <summary>The visible top-level windows of a process, with a caption.</summary>
@@ -186,6 +201,10 @@ public static class WindowFocus
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int processId);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int maxCount);
+
+    private const byte VK_MENU = 0x12;
+    private const uint KEYEVENTF_EXTENDEDKEY = 0x1, KEYEVENTF_KEYUP = 0x2;
+    [DllImport("user32.dll")] private static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extraInfo);
 
     private const uint GW_OWNER = 4;
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
