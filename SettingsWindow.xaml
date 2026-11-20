@@ -47,8 +47,9 @@
             <TextBlock Text="s" VerticalAlignment="Center"/>
         </StackPanel>
         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-            <TextBlock Text="Relembrar a cada" VerticalAlignment="Center"/>
-            <TextBox x:Name="Remind" Width="40" Margin="8,0" TextAlignment="Center"/>
+            <TextBlock Text="Relembrar pedidos a cada" VerticalAlignment="Center"/>
+            <TextBox x:Name="Remind" Width="40" Margin="8,0" TextAlignment="Center"
+                     ToolTip="Só para sessões à espera de ti (permissões, perguntas), no máximo 3 vezes. Tarefas concluídas avisam uma só vez."/>
             <TextBlock Text="min (0 = só uma vez)" VerticalAlignment="Center"/>
         </StackPanel>
         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">

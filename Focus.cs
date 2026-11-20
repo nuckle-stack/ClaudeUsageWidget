@@ -17,32 +17,76 @@ public static class WindowFocus
     /// <summary>Returns the name of the process whose window was focused, or null if none was found.</summary>
     public static string? Focus(int pid)
     {
+        foreach (var p in Ancestors(pid))
+        {
+            using (p)
+            {
+                var hwnd = p.MainWindowHandle;
+                if (hwnd == IntPtr.Zero) continue;
+                if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
+                SetForegroundWindow(hwnd);
+                return p.ProcessName;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Whether the session is on screen in front of the user: the foreground
+    /// window belongs to the process tree hosting it and shows its title.
+    /// The process alone is not enough: one Windows Terminal process holds
+    /// every window and tab, and only the active tab's title reaches the window
+    /// caption. Without a title to match (or in the desktop app, whose caption
+    /// is just "Claude") the answer is no, so an alert is never lost.
+    /// </summary>
+    public static bool IsForeground(int pid, string title)
+    {
+        if (title.Length == 0) return false;
+        var fg = GetForegroundWindow();
+        if (fg == IntPtr.Zero) return false;
+        GetWindowThreadProcessId(fg, out var fgPid);
+
+        var hosted = false;
+        foreach (var p in Ancestors(pid))
+            using (p)
+                if (p.Id == fgPid) hosted = true;
+        if (!hosted) return false;
+
+        var caption = new System.Text.StringBuilder(512);
+        GetWindowText(fg, caption, caption.Capacity);
+        // Claude Code puts a status glyph ("✳", a spinner) before the title. Compare
+        // the rest whole: one title is often the start of another
+        // ("Estado do projeto" / "Estado do projeto claudewidget").
+        var text = caption.ToString();
+        var start = 0;
+        while (start < text.Length && !char.IsLetterOrDigit(text[start])) start++;
+        text = text[start..].Trim();
+        return string.Equals(text, title.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The process and its parents, nearest first, up to the session's host. Callers dispose them.</summary>
+    private static IEnumerable<Process> Ancestors(int pid)
+    {
         var seen = new HashSet<int>();
         DateTime? childStart = null;
         for (var id = pid; id > 4 && seen.Add(id);)
         {
-            int parent;
+            Process p;
             try
             {
-                using var p = Process.GetProcessById(id);
-                if (Stop.Contains(p.ProcessName)) return null;
+                p = Process.GetProcessById(id);
                 // A "parent" that started after its child is a reused pid, not a parent.
-                if (childStart is { } cs && p.StartTime > cs) return null;
-                childStart = p.StartTime;
-
-                var hwnd = p.MainWindowHandle;
-                if (hwnd != IntPtr.Zero)
+                if (Stop.Contains(p.ProcessName) || (childStart is { } cs && p.StartTime > cs))
                 {
-                    if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
-                    SetForegroundWindow(hwnd);
-                    return p.ProcessName;
+                    p.Dispose();
+                    yield break;
                 }
-                parent = ParentOf(p);
+                childStart = p.StartTime;
+                id = ParentOf(p);
             }
-            catch { return null; }
-            id = parent;
+            catch { yield break; }
+            yield return p;
         }
-        return null;
     }
 
     private static int ParentOf(Process p)
@@ -73,4 +117,8 @@ public static class WindowFocus
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int processId);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int maxCount);
 }

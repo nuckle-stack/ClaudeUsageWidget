@@ -16,6 +16,8 @@ public class Alert
     public long StatusStamp { get; init; }
     public bool Acked { get; set; }
     public DateTime LastNotified { get; set; }
+    /// <summary>Reminders sent after the first announcement.</summary>
+    public int Reminders { get; set; }
 }
 
 /// <summary>
@@ -150,14 +152,27 @@ public class AlertTracker
         var due = new List<Alert>();
         foreach (var a in _alerts.Values.Where(a => !a.Acked))
         {
+            // Looking at the session's window is as good as clicking the widget.
+            if (live.TryGetValue(a.SessionId, out var s) && WindowFocus.IsForeground(s.Pid, s.Name))
+            {
+                a.Acked = true;
+                continue;
+            }
+
             var first = a.LastNotified == default;
-            var remind = cfg.RemindMinutes > 0 && DateTime.UtcNow - a.LastNotified >= TimeSpan.FromMinutes(cfg.RemindMinutes);
+            // A finished task does not get worse by waiting, so it is said once.
+            // A session waiting for input is stuck, so it is repeated, a few times.
+            var remind = a.Kind == AlertKind.Input && cfg.RemindMinutes > 0 && a.Reminders < MaxReminders &&
+                         DateTime.UtcNow - a.LastNotified >= TimeSpan.FromMinutes(cfg.RemindMinutes);
             if (!first && !remind) continue;
+            if (!first) a.Reminders++;
             a.LastNotified = DateTime.UtcNow;
             due.Add(a);
         }
         return due;
     }
+
+    private const int MaxReminders = 3;
 
     private void Raise(SessionInfo s, AlertKind kind, string message)
     {

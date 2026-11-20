@@ -46,6 +46,8 @@ USAR
     a frente. O "x" (ao passar o rato) esconde-a até voltar a ter atividade.
   - Botão direito: Definições (auto-hello, avisos, cores), Não incomodar, Sair.
   - Também há um ícone na área de notificação, junto ao relógio.
+  - Avisos: "terminou" avisa uma vez; "precisa de ti" relembra até 3 vezes.
+    Se já estás a olhar para a janela da sessão, o aviso conta como visto.
 
   Qualidade do contexto (opcional): se tiveres o plugin "token-optimizer" do
   Claude Code, cada sessão mostra também a qualidade e a ocupação do contexto
