@@ -41,7 +41,8 @@ podes apagar esta pasta depois de instalar.
 
 USAR
 ----
-  - O widget aparece no canto inferior direito. Arrasta-o para onde quiseres.
+  - O widget aparece no fundo do ecrã, à esquerda do canto onde o Windows
+    mostra as notificações (para não ficar tapado). Arrasta-o para onde quiseres.
   - Clique: abre a lista de sessões. Clicar numa sessão traz a janela dela para
     a frente. O "x" (ao passar o rato) esconde-a até voltar a ter atividade.
   - Botão direito: Definições (auto-hello, avisos, cores), Não incomodar, Sair.
@@ -66,9 +67,10 @@ USAR
   - Se um limite esgotar e o Claude continuar com uso extra (pago à parte),
     o widget avisa. Quando um limite esgotado renova, também avisa.
   - "Hoje: 9% de 14% do limite semanal", no topo da lista de sessões: o que
-    sobrava da semana à meia-noite, repartido por hoje e pelos dias úteis até
-    ao reset (nas Definições podes contar também os fins de semana). Se hoje
-    passares a tua parte, o widget avisa uma vez.
+    sobrava da semana quando o dia começou, repartido por hoje e pelos dias
+    úteis até ao reset. O dia começa às 4:00, para uma noite tardia contar com
+    a véspera; nas Definições mudas essa hora e podes contar também os fins de
+    semana. Se hoje passares a tua parte, o widget avisa uma vez.
   - "Consumo", na lista de sessões: quanto da janela de 5h (ou da semana)
     gastou cada projeto e cada sessão. É uma estimativa: reparte o uso do
     Claude Code neste PC pelo custo equivalente na API (o Opus pesa mais do

@@ -123,3 +123,7 @@ impressa e a passagem para um statusline que já existisse. Demoram cerca de
 | `tests\feed.Tests.ps1` | Testes Pester do `feed.ps1` |
 | `pack.ps1` | Gera o pacote em `dist\` |
 | `release.ps1` | Publica a versão do `.csproj` como release no GitHub, com o zip |
+
+## Licença
+
+MIT: ver [LICENSE](LICENSE).

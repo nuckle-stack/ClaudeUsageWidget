@@ -96,6 +96,43 @@ public class BudgetTests
         Assert.Equal("Hoje: <1% de 16% do limite semanal", UsageHistory.BudgetText(b));
     }
 
+    // ---- when "today" starts ---------------------------------------------------
+
+    [Theory]
+    [InlineData(19, 1, 30, 18)]   // Thursday 01:30: still Wednesday's evening
+    [InlineData(19, 4, 0, 19)]    // from 04:00 it is Thursday
+    [InlineData(19, 23, 0, 19)]
+    public void The_day_starts_at_four(int day, int hour, int minute, int belongsTo)
+    {
+        Assert.Equal(Local(belongsTo, 4), UsageHistory.DayStart(Local(day, hour, minute), 4));
+    }
+
+    [Fact]
+    public void A_late_night_counts_with_its_evening()
+    {
+        // 20% at Wednesday 03:00, 26% by Wednesday evening, 31% at 01:30 on Thursday.
+        var history = With(Week(Local(18, 3), 20), Week(Local(18, 21), 26), Week(Local(19, 1, 30), 31));
+
+        var fromFour = history.Budget(Local(19, 1, 30), weekdaysOnly: true, dayStartHour: 4)!;
+        Assert.Equal(11, fromFour.UsedToday, precision: 6);   // all of Wednesday, from 04:00
+        Assert.Equal(5, fromFour.Days);                        // Wed (today), Thu, Fri, Mon, Tue
+        Assert.Equal(16, fromFour.Allowance, precision: 6);
+
+        var fromMidnight = history.Budget(Local(19, 1, 30), weekdaysOnly: true)!;
+        Assert.Equal(5, fromMidnight.UsedToday, precision: 6);   // a "new day" 90 minutes old
+        Assert.Equal(4, fromMidnight.Days);
+    }
+
+    [Fact]
+    public void After_midnight_the_evening_s_alert_is_not_given_again()
+    {
+        var file = new HistoryFile { Samples = [Week(Local(17, 23), 20), Week(Local(18, 22), 38)] };
+        var history = new UsageHistory(file);
+        Assert.NotNull(history.PendingBudgetAlert(Local(18, 22), On));
+        file.Samples.Add(Week(Local(19, 1), 40));
+        Assert.Null(history.PendingBudgetAlert(Local(19, 1), On));   // still Wednesday's day
+    }
+
     // ---- the alert ------------------------------------------------------------
 
     private static readonly UsageAlertsConfig On = new() { DailyBudget = true, BudgetWeekdaysOnly = true };

@@ -234,7 +234,7 @@ public class UsageHistory
     /// was left at midnight shared equally over today and the days to the
     /// reset. Null without a running weekly window.
     /// </summary>
-    public DailyBudget? Budget(DateTime nowLocal, bool weekdaysOnly)
+    public DailyBudget? Budget(DateTime nowLocal, bool weekdaysOnly, int dayStartHour = 0)
     {
         var last = _file.Samples.LastOrDefault(s => s.R7 > 0);
         if (last is null) return null;
@@ -242,7 +242,9 @@ public class UsageHistory
         var now = new DateTimeOffset(nowLocal).ToUnixTimeSeconds();
         if (now >= resetsAt) return null;
 
-        var midnight = new DateTimeOffset(nowLocal.Date).ToUnixTimeSeconds();
+        // "Today" starts at dayStartHour, not at midnight: work past midnight
+        // still belongs to the evening it started in.
+        var midnight = new DateTimeOffset(DayStart(nowLocal, dayStartHour)).ToUnixTimeSeconds();
         var same = _file.Samples.Where(s => Math.Abs(s.R7 - resetsAt) <= 60).ToList();
         var before = same.LastOrDefault(s => s.T < midnight);
         double start;
@@ -257,8 +259,17 @@ public class UsageHistory
             reliable = false;
         }
 
-        var days = DaysToShare(nowLocal, DateTimeOffset.FromUnixTimeSeconds(resetsAt).LocalDateTime, weekdaysOnly);
+        // On a clock that starts the day at dayStartHour, the days to share are plain calendar days.
+        var shift = TimeSpan.FromHours(-dayStartHour);
+        var days = DaysToShare(nowLocal + shift, DateTimeOffset.FromUnixTimeSeconds(resetsAt).LocalDateTime + shift, weekdaysOnly);
         return new DailyBudget(Math.Max(0, last.P7 - start), Math.Max(0, 100 - start) / days, days, resetsAt, reliable);
+    }
+
+    /// <summary>When the day that now belongs to began: today at that hour, or yesterday's when it is not that late yet.</summary>
+    internal static DateTime DayStart(DateTime nowLocal, int hour)
+    {
+        var start = nowLocal.Date.AddHours(hour);
+        return nowLocal < start ? start.AddDays(-1) : start;
     }
 
     /// <summary>
@@ -288,8 +299,8 @@ public class UsageHistory
     /// <summary>Once a day, when today has taken more than its share of the week.</summary>
     public (string Title, string Text)? PendingBudgetAlert(DateTime nowLocal, UsageAlertsConfig cfg)
     {
-        if (!cfg.DailyBudget || Budget(nowLocal, cfg.BudgetWeekdaysOnly) is not { Reliable: true, Over: true } b) return null;
-        var day = nowLocal.ToString("yyyy-MM-dd");
+        if (!cfg.DailyBudget || Budget(nowLocal, cfg.BudgetWeekdaysOnly, cfg.DayStartHour) is not { Reliable: true, Over: true } b) return null;
+        var day = DayStart(nowLocal, cfg.DayStartHour).ToString("yyyy-MM-dd");
         if (_file.BudgetDay == day) return null;
         _file.BudgetDay = day;
         Save();

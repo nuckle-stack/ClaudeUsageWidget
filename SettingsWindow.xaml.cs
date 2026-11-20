@@ -40,6 +40,7 @@ public partial class SettingsWindow : Window
         ForecastAlert.IsChecked = cfg.UsageAlerts.Forecast;
         BudgetAlert.IsChecked = cfg.UsageAlerts.DailyBudget;
         BudgetWeekdays.IsChecked = cfg.UsageAlerts.BudgetWeekdaysOnly;
+        DayStartHour.Text = cfg.UsageAlerts.DayStartHour.ToString();
         ContextEnabled.IsChecked = cfg.ContextAlerts.Enabled;
         QualityBelow.Text = cfg.ContextAlerts.QualityBelow.ToString();
         FillAbove.Text = cfg.ContextAlerts.FillAbove.ToString();
@@ -114,6 +115,12 @@ public partial class SettingsWindow : Window
             levels.Add(level);
         }
 
+        if (!int.TryParse(DayStartHour.Text, out var dayStart) || dayStart < 0 || dayStart > 12)
+        {
+            Fail("O dia começa a uma hora entre 0 e 12 (ex. 4 para as 4:00).");
+            return;
+        }
+
         if (!int.TryParse(QualityBelow.Text, out var qualityBelow) || qualityBelow < 0 || qualityBelow > 100 ||
             !int.TryParse(FillAbove.Text, out var fillAbove) || fillAbove < 0 || fillAbove > 100)
         {
@@ -143,6 +150,7 @@ public partial class SettingsWindow : Window
                 Forecast = ForecastAlert.IsChecked == true,
                 DailyBudget = BudgetAlert.IsChecked == true,
                 BudgetWeekdaysOnly = BudgetWeekdays.IsChecked == true,
+                DayStartHour = dayStart,
             },
             Alerts = new AlertsConfig
             {
@@ -174,6 +182,7 @@ public partial class SettingsWindow : Window
             ClaudePath = _original.ClaudePath,
             Hotkey = hotkey,
             CheckUpdates = CheckUpdates.IsChecked == true,
+            ClearOfToasts = _original.ClearOfToasts,
         };
 
         SetAutoStart(AutoStart.IsChecked == true);

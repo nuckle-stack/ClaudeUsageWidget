@@ -68,6 +68,11 @@
                   Content="Avisar quando hoje passar a parte diária do limite semanal"/>
         <CheckBox x:Name="BudgetWeekdays" Margin="20,6,0,0"
                   Content="Repartir só pelos dias úteis (hoje conta sempre)"/>
+        <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
+            <TextBlock Text="O dia começa às" VerticalAlignment="Center"/>
+            <TextBox x:Name="DayStartHour" Width="30" Margin="8,0" TextAlignment="Center"/>
+            <TextBlock Text="h (uma noite tardia conta com a véspera)" VerticalAlignment="Center"/>
+        </StackPanel>
         <CheckBox x:Name="ContextEnabled" Margin="0,12,0,0"
                   Content="Avisar quando o contexto de uma sessão degrada"/>
         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">

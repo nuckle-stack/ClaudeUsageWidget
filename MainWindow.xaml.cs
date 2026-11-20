@@ -354,7 +354,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private DailyBudget? TodayBudget() => _history.Budget(DateTime.Now, _cfg.UsageAlerts.BudgetWeekdaysOnly);
+    private DailyBudget? TodayBudget() => _history.Budget(DateTime.Now, _cfg.UsageAlerts.BudgetWeekdaysOnly, _cfg.UsageAlerts.DayStartHour);
 
     /// <summary>The pace lines shown in the tooltip and the sessions panel, and today's share of the week.</summary>
     private string ForecastText()
@@ -684,7 +684,17 @@ public partial class MainWindow : Window
     private void PlaceWindow()
     {
         var area = SystemParameters.WorkArea;
-        var left = _cfg.Left ?? area.Right - ActualWidth - 16;
+        // Windows opens its notifications in the bottom-right corner, right over
+        // a widget there. Once, a widget left in that corner (the old default)
+        // moves to their left; dragged back afterwards, it stays where it is put.
+        if (!_cfg.ClearOfToasts)
+        {
+            if (Placement.InToastCorner(_cfg.Left, _cfg.Top, ActualWidth, ActualHeight, area))
+                _cfg.Left = Placement.BesideToasts(ActualWidth, area);
+            _cfg.ClearOfToasts = true;
+            Json.Save(Paths.Config, _cfg);
+        }
+        var left = _cfg.Left ?? Placement.BesideToasts(ActualWidth, area);
         var top = _cfg.Top ?? area.Bottom - ActualHeight - 16;
 
         // A saved position can point at a monitor that is no longer attached.

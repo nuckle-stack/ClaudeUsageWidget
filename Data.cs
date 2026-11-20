@@ -162,6 +162,8 @@ public class UsageAlertsConfig
     public bool DailyBudget { get; set; } = true;
     /// <summary>Share the weekly limit over working days only (today always counts).</summary>
     public bool BudgetWeekdaysOnly { get; set; } = true;
+    /// <summary>The hour "today" starts at for the daily share, so a late night counts with its evening.</summary>
+    public int DayStartHour { get; set; } = 4;
 }
 
 public class Config
@@ -203,6 +205,8 @@ public class Config
     public string Hotkey { get; set; } = "Ctrl+Alt+C";
     /// <summary>Look for a newer version on GitHub every few hours, and offer to install it.</summary>
     public bool CheckUpdates { get; set; } = true;
+    /// <summary>The widget was moved out of the notifications' corner (done once; it may be dragged back).</summary>
+    public bool ClearOfToasts { get; set; }
 }
 
 public class State

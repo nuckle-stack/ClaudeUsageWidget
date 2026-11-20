@@ -15,6 +15,7 @@ dotnet publish (Join-Path $root 'ClaudeUsageWidget.csproj') -c Release -r win-x6
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish falhou.' }
 
 Copy-Item -Path (Join-Path $root 'installer\*') -Destination $out -Force
+Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination $out -Force
 
 if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
 Compress-Archive -Path $out -DestinationPath $zip

@@ -288,7 +288,7 @@ if (-not $NoLaunch) {
     # Otherwise the widget keeps the folder this script ran from in use, and
     # that folder can't be deleted or rebuilt (e.g. dist\ by pack.ps1).
     Start-Process -FilePath $exeTarget -WorkingDirectory $InstallDir
-    Step 'Widget iniciado (canto inferior direito).'
+    Step 'Widget iniciado (no fundo do ecrã, à direita).'
 }
 
 if ($limitsOk -ne $true) {
