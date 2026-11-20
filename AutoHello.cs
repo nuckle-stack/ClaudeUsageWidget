@@ -67,9 +67,13 @@ public class AutoHello
             var failures = new List<string>();
             foreach (var (path, source) in Candidates(cfg.ClaudePath).OrderBy(c => c.Path == _lastGood ? 0 : 1))
             {
-                (ok, detail, limits) = await RunClaudeAsync(cfg, path);
+                bool timedOut;
+                (ok, detail, limits, timedOut) = await RunClaudeAsync(cfg, path);
                 if (ok) { _lastGood = path; used = source; break; }
                 failures.Add($"[{source}] {detail}");
+                // A hang is the network or the machine, not this copy of Claude
+                // Code: the next copy would hang just as long.
+                if (timedOut) break;
             }
             if (!ok && failures.Count > 0) detail = string.Join(" | ", failures);
             var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -170,7 +174,10 @@ public class AutoHello
         return _activity;
     }
 
-    private static async Task<(bool Ok, string Detail, Limits? Limits)> RunClaudeAsync(Config cfg, string claude)
+    /// <summary>A hello answers in seconds; this is for a slow first start, not a stuck one.</summary>
+    private static readonly TimeSpan HelloTimeout = TimeSpan.FromSeconds(90);
+
+    private static async Task<(bool Ok, string Detail, Limits? Limits, bool TimedOut)> RunClaudeAsync(Config cfg, string claude)
     {
         try
         {
@@ -194,6 +201,9 @@ public class AutoHello
                 "-p", string.IsNullOrWhiteSpace(cfg.AutoHello.Message) ? "hello" : cfg.AutoHello.Message,
                 "--model", string.IsNullOrWhiteSpace(cfg.AutoHello.Model) ? "haiku" : cfg.AutoHello.Model,
                 "--no-session-persistence", "--disable-slash-commands", "--strict-mcp-config",
+                // The user's hooks are for their sessions, not for this ping, and
+                // one that waits on something (a prompt, a server) hangs it.
+                "--settings", """{"disableAllHooks":true}""",
                 // The rate limits only appear in the event stream.
                 "--output-format", "stream-json", "--verbose",
             ];
@@ -205,26 +215,62 @@ public class AutoHello
                 if (key.StartsWith("CLAUDECODE", StringComparison.OrdinalIgnoreCase) ||
                     key.StartsWith("CLAUDE_CODE_", StringComparison.OrdinalIgnoreCase))
                     psi.Environment.Remove(key);
+            // No update check, telemetry or plugin sync: none is needed for one
+            // message, and each can stall on a slow or filtered network. Plugin
+            // sync runs git, which with no window to ask in waits forever for
+            // credentials unless told not to ask.
+            psi.Environment["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1";
+            psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
 
             using var p = Process.Start(psi)!;
             p.StandardInput.Close();
-            var stdout = p.StandardOutput.ReadToEndAsync();
             var stderr = p.StandardError.ReadToEndAsync();
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
-            try { await p.WaitForExitAsync(cts.Token); }
+            // Read line by line and stop at the "result" event: everything needed
+            // has arrived by then. Waiting for the process to exit, or for the
+            // pipe to close, is not enough on its own: a child process left
+            // behind keeps the pipe open after claude itself has exited.
+            var output = new System.Text.StringBuilder();
+            var gotResult = false;
+            using var cts = new CancellationTokenSource(HelloTimeout);
+            try
+            {
+                while (await p.StandardOutput.ReadLineAsync(cts.Token) is { } line)
+                {
+                    output.AppendLine(line);
+                    if (line.Contains("\"type\":\"result\"")) { gotResult = true; break; }
+                }
+                // Give it a moment to exit by itself, for the exit code.
+                using var grace = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+                grace.CancelAfter(TimeSpan.FromSeconds(10));
+                try { await p.WaitForExitAsync(grace.Token); }
+                catch (OperationCanceledException) when (!cts.IsCancellationRequested) { }
+            }
             catch (OperationCanceledException)
             {
-                try { p.Kill(true); } catch { }
-                return (false, "timeout", null);
+                KillTree(p);
+                var seen = output.Length > 0 ? $" (última saída: {FailureDetail("", output.ToString())})" : " (sem saída)";
+                return (false, $"sem resposta em {HelloTimeout.TotalSeconds:0} s{seen}", null, true);
             }
+            KillTree(p);
 
-            var output = await stdout;
-            if (p.ExitCode == 0) return (true, "ok", ParseLimits(output));
+            var text = output.ToString();
+            var exitCode = p.HasExited ? p.ExitCode : 0;
+            // The result event says whether the turn failed even when the
+            // process is still lingering.
+            var isError = gotResult && text.Contains("\"is_error\":true");
+            if (exitCode == 0 && gotResult && !isError) return (true, "ok", ParseLimits(text), false);
 
-            return (false, $"exit {p.ExitCode}: {FailureDetail(await stderr, output)}", null);
+            var err = stderr.IsCompleted ? await stderr : "";
+            var why = exitCode != 0 ? $"exit {exitCode}" : gotResult ? "erro" : "terminou sem resposta";
+            return (false, $"{why}: {FailureDetail(err, text)}", null, false);
         }
-        catch (Exception ex) { return (false, ex.Message, null); }
+        catch (Exception ex) { return (false, ex.Message, null, false); }
+    }
+
+    private static void KillTree(Process p)
+    {
+        try { if (!p.HasExited) p.Kill(true); } catch { }
     }
 
     /// <summary>

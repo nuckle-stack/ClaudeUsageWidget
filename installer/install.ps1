@@ -231,12 +231,23 @@ if ($AutoStart) {
 #    launch so the widget starts with the reading.
 $limitsOk = $null
 if (-not $NoCheck) {
-    Write-Host '  A testar a leitura dos limites (envia um "hello" curto no Haiku)...'
+    Write-Host '  A testar a leitura dos limites (envia um "hello" curto no Haiku; até 2 min)' -NoNewline
     $logPath = Join-Path $widgetDir 'widget.log'
     $logBefore = if (Test-Path -LiteralPath $logPath) { (Get-Item -LiteralPath $logPath).Length } else { 0 }
     $p = Start-Process -FilePath $exeTarget -ArgumentList '--hello' -WorkingDirectory $InstallDir -PassThru -WindowStyle Hidden
     $null = $p.Handle   # without holding the handle, ExitCode comes back empty in PowerShell 5.1
-    if (-not $p.WaitForExit(240000)) { try { $p.Kill() } catch { } }
+    # The widget gives up on its own after 90 s; this is the backstop. A dot
+    # every few seconds, so a slow test doesn't look like a frozen console.
+    $deadline = (Get-Date).AddSeconds(150)
+    while (-not $p.WaitForExit(3000)) {
+        Write-Host '.' -NoNewline
+        if ((Get-Date) -gt $deadline) {
+            # /T: the claude.exe it started too, or it keeps running hidden.
+            & taskkill.exe /PID $p.Id /T /F 2>&1 | Out-Null
+            break
+        }
+    }
+    Write-Host ''
     $limitsOk = $p.HasExited -and $p.ExitCode -eq 0
 
     # What the widget logged about it (which Claude Code it used, or why it failed).
