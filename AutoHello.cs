@@ -231,14 +231,14 @@ public class AutoHello
             // pipe to close, is not enough on its own: a child process left
             // behind keeps the pipe open after claude itself has exited.
             var output = new System.Text.StringBuilder();
-            var gotResult = false;
+            bool? isError = null;   // set by the result event
             using var cts = new CancellationTokenSource(HelloTimeout);
             try
             {
                 while (await p.StandardOutput.ReadLineAsync(cts.Token) is { } line)
                 {
                     output.AppendLine(line);
-                    if (line.Contains("\"type\":\"result\"")) { gotResult = true; break; }
+                    if ((isError = ResultError(line)) is not null) break;
                 }
                 // Give it a moment to exit by itself, for the exit code.
                 using var grace = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
@@ -258,14 +258,33 @@ public class AutoHello
             var exitCode = p.HasExited ? p.ExitCode : 0;
             // The result event says whether the turn failed even when the
             // process is still lingering.
-            var isError = gotResult && text.Contains("\"is_error\":true");
-            if (exitCode == 0 && gotResult && !isError) return (true, "ok", ParseLimits(text), false);
+            if (exitCode == 0 && isError == false) return (true, "ok", ParseLimits(text), false);
 
             var err = stderr.IsCompleted ? await stderr : "";
-            var why = exitCode != 0 ? $"exit {exitCode}" : gotResult ? "erro" : "terminou sem resposta";
+            var why = exitCode != 0 ? $"exit {exitCode}" : isError == true ? "erro" : "terminou sem resposta";
             return (false, $"{why}: {FailureDetail(err, text)}", null, false);
         }
         catch (Exception ex) { return (false, ex.Message, null, false); }
+    }
+
+    /// <summary>
+    /// For the final "result" event of a stream-json run: whether the turn
+    /// failed. Null for any other line. Its "type" sits mid-line, after the
+    /// usage figures, so the line is parsed rather than matched as text.
+    /// </summary>
+    public static bool? ResultError(string line)
+    {
+        if (!line.Contains("\"result\"")) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(line);
+            var e = doc.RootElement;
+            if (e.ValueKind != JsonValueKind.Object ||
+                !e.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String ||
+                type.GetString() != "result") return null;
+            return e.TryGetProperty("is_error", out var err) && err.ValueKind == JsonValueKind.True;
+        }
+        catch (JsonException) { return null; }
     }
 
     private static void KillTree(Process p)

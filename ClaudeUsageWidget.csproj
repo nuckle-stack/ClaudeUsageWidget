@@ -19,4 +19,12 @@
     <Using Remove="System.Drawing" />
   </ItemGroup>
 
+  <!-- The tests live in a subfolder, which the SDK would otherwise compile
+       into the widget. They see the internals (test hooks, title matching). -->
+  <ItemGroup>
+    <Compile Remove="tests\**" />
+    <None Remove="tests\**" />
+    <InternalsVisibleTo Include="ClaudeUsageWidget.Tests" />
+  </ItemGroup>
+
 </Project>

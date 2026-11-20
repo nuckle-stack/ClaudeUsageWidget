@@ -99,7 +99,7 @@ public static class WindowFocus
     /// rest is compared whole, as one title is often the start of another
     /// ("Estado do projeto" / "Estado do projeto claudewidget").
     /// </summary>
-    private static bool SameTitle(string caption, string title)
+    internal static bool SameTitle(string caption, string title)
     {
         if (title.Trim().Length == 0) return false;
         var start = 0;

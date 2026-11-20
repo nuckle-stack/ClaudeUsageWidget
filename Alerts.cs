@@ -163,16 +163,19 @@ public class AlertTracker
             // A finished task does not get worse by waiting, so it is said once.
             // A session waiting for input is stuck, so it is repeated, a few times.
             var remind = a.Kind == AlertKind.Input && cfg.RemindMinutes > 0 && a.Reminders < MaxReminders &&
-                         DateTime.UtcNow - a.LastNotified >= TimeSpan.FromMinutes(cfg.RemindMinutes);
+                         Clock() - a.LastNotified >= TimeSpan.FromMinutes(cfg.RemindMinutes);
             if (!first && !remind) continue;
             if (!first) a.Reminders++;
-            a.LastNotified = DateTime.UtcNow;
+            a.LastNotified = Clock();
             due.Add(a);
         }
         return due;
     }
 
-    private const int MaxReminders = 3;
+    internal const int MaxReminders = 3;
+
+    /// <summary>The time reminders are measured against; replaced in tests.</summary>
+    internal Func<DateTime> Clock { get; set; } = () => DateTime.UtcNow;
 
     private void Raise(SessionInfo s, AlertKind kind, string message)
     {

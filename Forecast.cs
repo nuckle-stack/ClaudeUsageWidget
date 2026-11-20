@@ -41,7 +41,22 @@ public class UsageHistory
     private static readonly CultureInfo Pt = CultureInfo.GetCultureInfo("pt-PT");
     private const int KeepSeconds = 8 * 86400;
 
-    private readonly HistoryFile _file = Json.Load<HistoryFile>(Paths.History);
+    private readonly HistoryFile _file;
+    /// <summary>Where to save; null keeps everything in memory (tests).</summary>
+    private readonly string? _path;
+
+    public UsageHistory() : this(Json.Load<HistoryFile>(Paths.History), Paths.History) { }
+
+    internal UsageHistory(HistoryFile file, string? path = null)
+    {
+        _file = file;
+        _path = path;
+    }
+
+    private void Save()
+    {
+        if (_path is not null) Json.Save(_path, _file);
+    }
 
     /// <summary>The readings of one limit since a moment, oldest first, for the history chart.</summary>
     public List<Sparkline.Point> Series(bool fiveHour, long since) =>
@@ -65,7 +80,7 @@ public class UsageHistory
             R7 = cur.SevenDay?.ResetsAt ?? 0,
         });
         _file.Samples.RemoveAll(s => s.T < cur.UpdatedAt - KeepSeconds);
-        Json.Save(Paths.History, _file);
+        Save();
         return true;
     }
 
@@ -164,7 +179,7 @@ public class UsageHistory
                 changed = true;
             }
         }
-        if (changed) Json.Save(Paths.History, _file);
+        if (changed) Save();
         return result;
     }
 
