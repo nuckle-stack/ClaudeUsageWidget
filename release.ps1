@@ -56,13 +56,10 @@ try {
 ## Instalar ou atualizar
 
 1. Em **Assets**, descarrega `ClaudeUsageWidget.zip` e extrai-o.
-2. Na pasta extraída, clica com o botão direito num espaço vazio > **Abrir no Terminal**, e corre:
-   ```
-   powershell -ExecutionPolicy Bypass -File .\install.ps1 -AutoStart
-   ```
-3. No fim, vê a linha **Limites:**. Se o teste falhar, o instalador indica um `diagnostico.txt`: envia-o a quem te deu o widget.
+2. Na pasta extraída, faz duplo clique em `ClaudeUsageWidget.exe` e carrega em **Instalar**. Se o Windows mostrar "O Windows protegeu o computador": **Mais informações** > **Executar mesmo assim** (o widget não é assinado).
+3. No fim, a janela diz se os limites estão OK. Se não estiverem, tem um botão para copiar o diagnóstico: envia-o a quem te deu o widget.
 
-Para atualizar faz o mesmo: o instalador fecha o widget antigo e mantém as tuas definições. O `LEIA-ME.txt` dentro do zip explica o resto.
+Para atualizar à mão faz o mesmo: o instalador fecha o widget antigo e mantém as tuas definições. Com a versão 1.2.0 ou mais recente nem é preciso: o widget oferece a versão nova sozinho. O `LEIA-ME.txt` dentro do zip explica o resto.
 
 SHA256 do zip: `{{SHA}}`
 '@
