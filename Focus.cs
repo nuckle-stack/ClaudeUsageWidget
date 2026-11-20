@@ -14,21 +14,97 @@ public static class WindowFocus
     private static readonly HashSet<string> Stop = new(StringComparer.OrdinalIgnoreCase)
         { "explorer", "sihost", "svchost", "services", "wininit", "winlogon", "ClaudeUsageWidget" };
 
-    /// <summary>Returns the name of the process whose window was focused, or null if none was found.</summary>
-    public static string? Focus(int pid)
+    /// <summary>
+    /// Brings the session's window to the front; returns the host process name,
+    /// or null if none was found. One Windows Terminal process owns every
+    /// terminal window, so its "main window" is the same whichever session was
+    /// asked for: the right one is picked by its caption (the active tab's
+    /// title) or, for a tab in the background, by selecting that tab.
+    /// </summary>
+    public static string? Focus(int pid, string title)
     {
         foreach (var p in Ancestors(pid))
         {
             using (p)
             {
-                var hwnd = p.MainWindowHandle;
-                if (hwnd == IntPtr.Zero) continue;
+                var windows = WindowsOf(p.Id);
+                if (windows.Count == 0) continue;
+                var hwnd = windows.FirstOrDefault(w => SameTitle(Caption(w), title));
+                if (hwnd == IntPtr.Zero) hwnd = SelectTab(windows, title);
+                if (hwnd == IntPtr.Zero) hwnd = p.MainWindowHandle != IntPtr.Zero ? p.MainWindowHandle : windows[0];
                 if (IsIconic(hwnd)) ShowWindow(hwnd, SW_RESTORE);
                 SetForegroundWindow(hwnd);
                 return p.ProcessName;
             }
         }
         return null;
+    }
+
+    /// <summary>The visible top-level windows of a process, with a caption.</summary>
+    private static List<IntPtr> WindowsOf(int pid)
+    {
+        var result = new List<IntPtr>();
+        EnumWindows((hwnd, _) =>
+        {
+            GetWindowThreadProcessId(hwnd, out var owner);
+            if (owner == pid && IsWindowVisible(hwnd) && GetWindow(hwnd, GW_OWNER) == IntPtr.Zero &&
+                Caption(hwnd).Length > 0)
+                result.Add(hwnd);
+            return true;
+        }, IntPtr.Zero);
+        return result;
+    }
+
+    /// <summary>
+    /// Finds the tab with this title in one of the windows and selects it,
+    /// through UI Automation (Windows Terminal exposes its tabs that way).
+    /// Returns the window that holds it.
+    /// </summary>
+    private static IntPtr SelectTab(List<IntPtr> windows, string title)
+    {
+        if (title.Trim().Length == 0) return IntPtr.Zero;
+        var isTab = new System.Windows.Automation.PropertyCondition(
+            System.Windows.Automation.AutomationElement.ControlTypeProperty,
+            System.Windows.Automation.ControlType.TabItem);
+        foreach (var w in windows)
+        {
+            try
+            {
+                var tabs = System.Windows.Automation.AutomationElement.FromHandle(w)
+                    .FindAll(System.Windows.Automation.TreeScope.Descendants, isTab);
+                foreach (System.Windows.Automation.AutomationElement tab in tabs)
+                {
+                    if (!SameTitle(tab.Current.Name, title) ||
+                        !tab.TryGetCurrentPattern(System.Windows.Automation.SelectionItemPattern.Pattern, out var pattern))
+                        continue;
+                    ((System.Windows.Automation.SelectionItemPattern)pattern).Select();
+                    return w;
+                }
+            }
+            catch { }
+        }
+        return IntPtr.Zero;
+    }
+
+    private static string Caption(IntPtr hwnd)
+    {
+        var text = new System.Text.StringBuilder(512);
+        GetWindowText(hwnd, text, text.Capacity);
+        return text.ToString();
+    }
+
+    /// <summary>
+    /// Whether a caption or tab name shows this session title. Claude Code puts
+    /// a status glyph ("✳", a spinner) before the title, so that is skipped; the
+    /// rest is compared whole, as one title is often the start of another
+    /// ("Estado do projeto" / "Estado do projeto claudewidget").
+    /// </summary>
+    private static bool SameTitle(string caption, string title)
+    {
+        if (title.Trim().Length == 0) return false;
+        var start = 0;
+        while (start < caption.Length && !char.IsLetterOrDigit(caption[start])) start++;
+        return string.Equals(caption[start..].Trim(), title.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -50,18 +126,7 @@ public static class WindowFocus
         foreach (var p in Ancestors(pid))
             using (p)
                 if (p.Id == fgPid) hosted = true;
-        if (!hosted) return false;
-
-        var caption = new System.Text.StringBuilder(512);
-        GetWindowText(fg, caption, caption.Capacity);
-        // Claude Code puts a status glyph ("✳", a spinner) before the title. Compare
-        // the rest whole: one title is often the start of another
-        // ("Estado do projeto" / "Estado do projeto claudewidget").
-        var text = caption.ToString();
-        var start = 0;
-        while (start < text.Length && !char.IsLetterOrDigit(text[start])) start++;
-        text = text[start..].Trim();
-        return string.Equals(text, title.Trim(), StringComparison.OrdinalIgnoreCase);
+        return hosted && SameTitle(Caption(fg), title);
     }
 
     /// <summary>The process and its parents, nearest first, up to the session's host. Callers dispose them.</summary>
@@ -121,4 +186,10 @@ public static class WindowFocus
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int processId);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int maxCount);
+
+    private const uint GW_OWNER = 4;
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr hWnd, uint cmd);
 }

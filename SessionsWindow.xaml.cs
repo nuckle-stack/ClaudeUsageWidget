@@ -230,7 +230,7 @@ public partial class SessionsWindow : Window
     {
         if ((sender as FrameworkElement)?.DataContext is not Row row) return;
         // Focusing another window deactivates this popup, which closes it.
-        var host = WindowFocus.Focus(row.Pid);
+        var host = WindowFocus.Focus(row.Pid, row.Name);
         Log.Write(host is null
             ? $"Foco: janela da sessão \"{row.Name}\" não encontrada."
             : $"Foco: sessão \"{row.Name}\" em {host}.");
