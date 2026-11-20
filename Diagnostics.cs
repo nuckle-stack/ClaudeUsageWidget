@@ -22,7 +22,8 @@ public static class Diagnostics
     /// <summary>What only the running widget knows.</summary>
     public record Live(
         Config Config, Limits Statusline, Limits Ping, bool HelloRunning,
-        (int Failures, long NextAttemptAt) Backoff, string Hotkey, List<SessionInfo> Sessions, int Waiting);
+        (int Failures, long NextAttemptAt) Backoff, string Hotkey, List<SessionInfo> Sessions, int Waiting,
+        string Updates = "");
 
     public static readonly string ReportPath = Path.Combine(Paths.Dir, "diagnostico.txt");
 
@@ -111,6 +112,7 @@ public static class Diagnostics
              $"parte do dia {YesNo(usage.DailyBudget)}{(usage.BudgetWeekdaysOnly ? " (dias úteis)" : " (todos os dias)")}");
         Line($"Avisos de contexto: {(cfg.ContextAlerts.Enabled ? $"qualidade abaixo de {cfg.ContextAlerts.QualityBelow}, ocupação acima de {cfg.ContextAlerts.FillAbove}%" : "desligados")}");
         Line($"Atalho: {live.Hotkey}");
+        Line($"Versões novas: {(live.Updates.Length > 0 ? live.Updates : (live.Config.CheckUpdates ? "ligado" : "desligado"))}");
         Line("Não incomodar: " + cfg.QuietUntil switch
         {
             0 => "desligado",

@@ -92,6 +92,7 @@
         <TextBlock Text="Janela" FontWeight="SemiBold" FontSize="13"/>
         <CheckBox x:Name="OnTop" Margin="0,8,0,0" Content="Sempre por cima"/>
         <CheckBox x:Name="AutoStart" Margin="0,8,0,0" Content="Iniciar com o Windows"/>
+        <CheckBox x:Name="CheckUpdates" Margin="0,8,0,0" Content="Procurar versões novas no GitHub e oferecer a instalação"/>
         <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
             <TextBlock Text="Esconder sessões do Desktop paradas há" VerticalAlignment="Center"/>
             <TextBox x:Name="HideIdle" Width="40" Margin="8,0" TextAlignment="Center"/>

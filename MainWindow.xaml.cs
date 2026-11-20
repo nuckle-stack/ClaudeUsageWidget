@@ -54,7 +54,7 @@ public partial class MainWindow : Window
             HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(OnWindowMessage);
             RegisterHotkey();
         };
-        Root.ContextMenu.Opened += (_, _) => FillQuietMenu();
+        Root.ContextMenu.Opened += (_, _) => { FillQuietMenu(); UpdateMenu.Header = UpdateLabel(); };
         FillQuietMenu();
         Loaded += (_, _) =>
         {
@@ -62,9 +62,120 @@ public partial class MainWindow : Window
             Tick();
             // Read the week of transcripts now, so the sessions list opens with it.
             _ = UsageLedger.Shared.RefreshAsync(TimeSpan.Zero);
+            AnnounceUpdated();
         };
         _timer.Tick += (_, _) => Tick();
         _timer.Start();
+
+        // The first look a minute after starting (not during the rush of a
+        // login), then every few hours.
+        _updateTimer.Tick += async (_, _) =>
+        {
+            _updateTimer.Interval = TimeSpan.FromHours(6);
+            await CheckUpdatesAsync(manual: false);
+        };
+        _updateTimer.Start();
+        Updater.CleanUp();
+    }
+
+    // ---- updates -----------------------------------------------------------
+
+    private readonly Updater _updater = new();
+    private readonly DispatcherTimer _updateTimer = new() { Interval = TimeSpan.FromMinutes(1) };
+    private bool _updating;
+
+    private string UpdateLabel() =>
+        _updater.Available is { } u ? $"Instalar a versão {u.Version.ToString(3)}…" : "Procurar versão nova";
+
+    private void OnUpdate(object sender, RoutedEventArgs e) => UpdateFromMenu();
+
+    private async void UpdateFromMenu()
+    {
+        if (_updater.Available is { } u) InstallUpdate(u);
+        else await CheckUpdatesAsync(manual: true);
+    }
+
+    /// <summary>Looks on GitHub; a new version is announced once, or every time when asked from the menu.</summary>
+    private async Task CheckUpdatesAsync(bool manual)
+    {
+        if (!manual && !_cfg.CheckUpdates) return;
+        try
+        {
+            if (await _updater.CheckAsync() is not { } update)
+            {
+                if (manual) Notify("Claude Usage", $"Tens a versão mais recente ({Updater.Current.ToString(3)}).", Forms.ToolTipIcon.Info, 4000, null);
+                return;
+            }
+            if (!manual && !_updater.ShouldAnnounce(update)) return;
+            Log.Write($"Versão nova no GitHub: {update.Version.ToString(3)}.");
+            Notify("Versão nova do Claude Usage",
+                $"A {update.Version.ToString(3)} está disponível (tens a {Updater.Current.ToString(3)}). Clica aqui para a instalar.",
+                Forms.ToolTipIcon.Info, 8000, () => InstallUpdate(update));
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Procura de versão nova falhou: {ex.Message}");
+            if (manual) Notify("Claude Usage", "Não deu para ver se há versão nova. Ver widget.log.", Forms.ToolTipIcon.Warning, 4000, null);
+        }
+    }
+
+    /// <summary>
+    /// On the user's go-ahead: download and check the zip, start its installer
+    /// and get out of its way. The installer starts the new version.
+    /// </summary>
+    private async void InstallUpdate(UpdateInfo update)
+    {
+        if (_updating) return;
+        var version = update.Version.ToString(3);
+        var notes = update.Notes.Length > 0 ? $"\n\n{update.Notes}" : "";
+        // Asked from a notification or the tray, the widget is not the active
+        // window, and its question could open behind the others.
+        if (!IsVisible) Show();
+        WindowFocus.BringToFront(new WindowInteropHelper(this).Handle);
+        var answer = MessageBox.Show(this,
+            $"Instalar a versão {version} do Claude Usage agora?\n\nO widget fecha-se e volta a abrir sozinho em poucos segundos. As definições ficam.{notes}",
+            "Versão nova do Claude Usage", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+
+        _updating = true;
+        try
+        {
+            Notify("Claude Usage", $"A descarregar a versão {version} ({update.Size / 1048576.0:0} MB)…", Forms.ToolTipIcon.Info, 4000, null);
+            var folder = await _updater.DownloadAsync(update);
+            Updater.RunInstaller(folder, SettingsWindow.IsAutoStart());
+            Log.Write($"Atualização para {version}: instalador iniciado (registo em update.log).");
+            Exit();
+        }
+        catch (Exception ex)
+        {
+            _updating = false;
+            Log.Write($"Atualização para {version} falhou: {ex}");
+            Notify("Não deu para atualizar", $"{ex.Message} Ver widget.log.", Forms.ToolTipIcon.Warning, 6000, null);
+        }
+    }
+
+    /// <summary>After an update, says so once; a click opens the release notes.</summary>
+    private void AnnounceUpdated()
+    {
+        if (_updater.JustUpdatedFrom() is not { } from) return;
+        var now = Updater.Current.ToString(3);
+        Log.Write($"Atualizado de {from} para {now}.");
+        Notify("Claude Usage atualizado", $"Estás agora na versão {now}. Clica para ver as novidades.", Forms.ToolTipIcon.Info, 6000,
+            () => OpenUrl($"https://github.com/{Updater.Repo}/releases/tag/v{now}"));
+    }
+
+    private static void OpenUrl(string url)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); }
+        catch (Exception ex) { Log.Write($"Não deu para abrir {url}: {ex.Message}"); }
+    }
+
+    /// <summary>For the diagnostics.</summary>
+    private string UpdateStatus()
+    {
+        if (!_cfg.CheckUpdates) return "desligadas";
+        var last = _updater.LastCheck == default ? "ainda não procurou" : $"procurou às {_updater.LastCheck.ToLocalTime():HH:mm}";
+        return $"ligadas · {last}" + (_updater.Available is { } u ? $" · há a {u.Version.ToString(3)}" : "");
     }
 
     // ---- refresh -----------------------------------------------------------
@@ -588,7 +699,7 @@ public partial class MainWindow : Window
         {
             var sessions = await Task.Run(SessionScanner.Scan);
             var text = await Diagnostics.BuildAsync(new Diagnostics.Live(
-                _cfg, _limits, _hello.Ping, _hello.Running, _hello.Backoff, _hotkeyState, sessions, _alerts.Waiting().Count));
+                _cfg, _limits, _hello.Ping, _hello.Running, _hello.Backoff, _hotkeyState, sessions, _alerts.Waiting().Count, UpdateStatus()));
             Directory.CreateDirectory(Paths.Dir);
             File.WriteAllText(Diagnostics.ReportPath, text);
 
@@ -640,15 +751,18 @@ public partial class MainWindow : Window
         menu.Items.Add(quiet);
         var sound = new Forms.ToolStripMenuItem("Som dos avisos", null, (_, _) => ToggleSound());
         menu.Items.Add(sound);
+        var update = new Forms.ToolStripMenuItem("Procurar versão nova", null, (_, _) => UpdateFromMenu());
         menu.Opening += (_, _) =>
         {
             FillQuietTray(quiet);
             sound.Checked = _cfg.Alerts.Sound;
             goTo.ShortcutKeyDisplayString = GoToWaitingMenu.InputGestureText;
+            update.Text = UpdateLabel();
         };
         menu.Items.Add("Definições…", null, (_, _) => OpenSettings());
         menu.Items.Add("Atualizar agora", null, (_, _) => HelloNow());
         menu.Items.Add("Copiar diagnóstico", null, (_, _) => CopyDiagnostics());
+        menu.Items.Add(update);
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Sair", null, (_, _) => Exit());
 

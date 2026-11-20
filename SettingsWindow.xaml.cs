@@ -44,6 +44,7 @@ public partial class SettingsWindow : Window
         QualityBelow.Text = cfg.ContextAlerts.QualityBelow.ToString();
         FillAbove.Text = cfg.ContextAlerts.FillAbove.ToString();
         AutoStart.IsChecked = IsAutoStart();
+        CheckUpdates.IsChecked = cfg.CheckUpdates;
         HideIdle.Text = cfg.HideIdleDesktopMinutes.ToString();
 
         HelloEnabled.Checked += (_, _) => SyncEnabled();
@@ -172,6 +173,7 @@ public partial class SettingsWindow : Window
             Top = _original.Top,
             ClaudePath = _original.ClaudePath,
             Hotkey = hotkey,
+            CheckUpdates = CheckUpdates.IsChecked == true,
         };
 
         SetAutoStart(AutoStart.IsChecked == true);
@@ -184,7 +186,7 @@ public partial class SettingsWindow : Window
         Error.Visibility = Visibility.Visible;
     }
 
-    private static bool IsAutoStart()
+    internal static bool IsAutoStart()
     {
         using var key = Registry.CurrentUser.OpenSubKey(RunKey);
         return key?.GetValue(RunName) is string;

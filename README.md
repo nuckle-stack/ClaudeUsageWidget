@@ -77,6 +77,14 @@ a versão anterior.
 
 A versão aparece no diagnóstico (`1.0.0+<commit>`).
 
+Os widgets instalados encontram o release novo sozinhos: perguntam ao GitHub
+(`/releases/latest`, sem login) um minuto depois de arrancar e depois de 6 em 6
+horas, avisam uma vez e, com o OK de quem o usa, descarregam o zip, conferem o
+SHA256, correm o `install.ps1` dele com `-NoCheck` e fecham-se. A saída do
+instalador fica em `~\.claude\usage-widget\update.log`. Só contam releases com
+uma tag `vX.Y.Z` e o `ClaudeUsageWidget.zip` anexado; rascunhos e pre-releases
+são ignorados.
+
 ### Statusline (`feed.ps1`, Pester)
 
 Na primeira vez, instala o Pester. O Windows traz a versão 3.4, que é antiga

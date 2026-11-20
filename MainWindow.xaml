@@ -43,6 +43,7 @@
                 <MenuItem Header="Definições…" Click="OnSettings"/>
                 <MenuItem Header="Atualizar agora" Click="OnHelloNow"/>
                 <MenuItem Header="Copiar diagnóstico" Click="OnCopyDiagnostics"/>
+                <MenuItem x:Name="UpdateMenu" Header="Procurar versão nova" Click="OnUpdate"/>
                 <Separator/>
                 <MenuItem Header="Esconder" Click="OnHide"/>
                 <MenuItem Header="Sair" Click="OnExit"/>

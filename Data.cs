@@ -201,6 +201,8 @@ public class Config
     public string ClaudePath { get; set; } = "claude";
     /// <summary>System-wide shortcut to the session waiting for you, e.g. "Ctrl+Alt+C". Empty = none.</summary>
     public string Hotkey { get; set; } = "Ctrl+Alt+C";
+    /// <summary>Look for a newer version on GitHub every few hours, and offer to install it.</summary>
+    public bool CheckUpdates { get; set; } = true;
 }
 
 public class State
