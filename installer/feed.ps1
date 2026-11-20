@@ -44,8 +44,14 @@ if ($null -ne $data.rate_limits) {
             }
         }
         $tmp = "$wFile.$PID.tmp"
-        [IO.File]::WriteAllText($tmp, ($out | ConvertTo-Json -Depth 4))
-        Move-Item -LiteralPath $tmp -Destination $wFile -Force
+        try {
+            [IO.File]::WriteAllText($tmp, ($out | ConvertTo-Json -Depth 4))
+            Move-Item -LiteralPath $tmp -Destination $wFile -Force
+        } finally {
+            # Two sessions writing at the same moment: one move loses. The next
+            # statusline refresh writes again, so just don't leave the file behind.
+            if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force }
+        }
     } catch { }
 }
 
