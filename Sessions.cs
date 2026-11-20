@@ -53,7 +53,7 @@ public static class SessionScanner
 
                 var sessionId = Str(root, "sessionId");
                 var cwd = Str(root, "cwd");
-                var name = Str(root, "name");
+                var name = Titles.For(claudeDir, sessionId, cwd, Str(root, "name"), Str(root, "nameSource"));
                 if (name.Length == 0) name = Path.GetFileName(cwd.TrimEnd('\\', '/'));
                 var started = Long(root, "startedAt");
 
@@ -138,4 +138,117 @@ public static class SessionScanner
 
     private static double? Num(JsonElement e, string name) =>
         e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out var n) ? n : null;
+}
+
+/// <summary>
+/// The title a session shows in its terminal tab. The session file only has a
+/// name derived from the folder ("claudeusagewidget-79"); the real title lives
+/// in the transcript, as "custom-title" lines (/rename) and "ai-title" lines
+/// (generated). Transcripts grow to many MB and the list refreshes every few
+/// seconds, so each one is read incrementally: only the bytes added since the
+/// last pass.
+/// </summary>
+public static class Titles
+{
+    private class Entry
+    {
+        public string? Path;
+        public DateTime Resolved;
+        public long Offset;
+        public string Custom = "";
+        public string Ai = "";
+    }
+
+    private static readonly Dictionary<string, Entry> Cache = new();
+
+    public static string For(string claudeDir, string sessionId, string cwd, string name, string nameSource)
+    {
+        if (sessionId.Length == 0) return name;
+        // The widget scans on a worker thread, the sessions popup on the UI thread.
+        lock (Cache)
+        {
+            if (!Cache.TryGetValue(sessionId, out var e)) Cache[sessionId] = e = new Entry();
+            try { Read(claudeDir, sessionId, cwd, e); } catch { }
+
+            // A name the user gave wins; a name derived from the folder is the last resort.
+            if (e.Custom.Length > 0) return e.Custom;
+            if (name.Length > 0 && nameSource != "derived") return name;
+            return e.Ai.Length > 0 ? e.Ai : name;
+        }
+    }
+
+    /// <summary>
+    /// How much of an old transcript to read the first time. The title lines are
+    /// repeated as the conversation goes on, so the tail has the current one.
+    /// </summary>
+    private const long FirstReadBytes = 4 * 1024 * 1024;
+
+    private static void Read(string claudeDir, string sessionId, string cwd, Entry e)
+    {
+        if (e.Path is null || !File.Exists(e.Path))
+        {
+            // Retry a missing transcript once a minute, not on every scan: a new
+            // session has none until its first message.
+            if (DateTime.UtcNow - e.Resolved < TimeSpan.FromMinutes(1)) return;
+            e.Resolved = DateTime.UtcNow;
+            e.Path = Locate(claudeDir, sessionId, cwd);
+            e.Offset = 0;
+            if (e.Path is null) return;
+        }
+
+        using var fs = new FileStream(e.Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        if (fs.Length < e.Offset) e.Offset = 0;   // rewritten
+        if (fs.Length == e.Offset) return;
+        // Starting mid-file cuts a line in two; the parse below just skips it.
+        if (fs.Length - e.Offset > FirstReadBytes) e.Offset = fs.Length - FirstReadBytes;
+        fs.Seek(e.Offset, SeekOrigin.Begin);
+
+        var buffer = new byte[fs.Length - e.Offset];
+        var read = 0;
+        while (read < buffer.Length)
+        {
+            var n = fs.Read(buffer, read, buffer.Length - read);
+            if (n == 0) break;
+            read += n;
+        }
+        // Leave a half-written last line for the next pass.
+        var end = Array.LastIndexOf(buffer, (byte)'\n', Math.Max(0, read - 1));
+        if (end < 0) return;
+        e.Offset += end + 1;
+
+        var text = System.Text.Encoding.UTF8.GetString(buffer, 0, end);
+        foreach (var line in text.Split('\n'))
+        {
+            var custom = line.Contains("\"custom-title\"");
+            if (!custom && !line.Contains("\"ai-title\"")) continue;
+            try
+            {
+                using var doc = JsonDocument.Parse(line);
+                var root = doc.RootElement;
+                var key = custom ? "customTitle" : "aiTitle";
+                if (!root.TryGetProperty(key, out var v) || v.ValueKind != JsonValueKind.String) continue;
+                var title = v.GetString()?.Trim() ?? "";
+                if (title.Length == 0) continue;
+                if (custom) e.Custom = title; else e.Ai = title;
+            }
+            catch (JsonException) { }
+        }
+    }
+
+    /// <summary>
+    /// projects\&lt;cwd with every non-alphanumeric as '-'&gt;\&lt;id&gt;.jsonl, or failing
+    /// that (the encoding is Claude Code's, not ours) any project folder holding it.
+    /// </summary>
+    private static string? Locate(string claudeDir, string sessionId, string cwd)
+    {
+        var projects = Path.Combine(claudeDir, "projects");
+        var file = sessionId + ".jsonl";
+        var folder = new string(cwd.Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-').ToArray());
+        var direct = Path.Combine(projects, folder, file);
+        if (File.Exists(direct)) return direct;
+        if (!Directory.Exists(projects)) return null;
+        return Directory.EnumerateDirectories(projects)
+            .Select(d => Path.Combine(d, file))
+            .FirstOrDefault(File.Exists);
+    }
 }
