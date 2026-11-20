@@ -222,10 +222,24 @@ public class UsageLedgerTests
     }
 
     [Fact]
+    public void Last_use_is_the_last_answer_not_the_last_write()
+    {
+        // An idle session appends bookkeeping lines (its title, its mode) with nobody using it.
+        var path = Transcript("p", "s1");
+        File.WriteAllText(path, Line("m1", "s1", @"D:\p", Now - 3600) + User + Line("m2", "s1", @"D:\p", Now - 1800));
+        File.AppendAllText(path,
+            """{"type":"ai-title","aiTitle":"Estado do projeto","sessionId":"s1"}""" + "\n" +
+            """{"type":"permission-mode","permissionMode":"default","sessionId":"s1"}""" + "\n");
+        Assert.Equal(Now - 1800, Read().LastUsedAt);
+    }
+
+    [Fact]
     public void No_transcripts_no_usage()
     {
-        var b = Read().Summarize(Now - 3600, Now + 1);
+        var ledger = Read();
+        var b = ledger.Summarize(Now - 3600, Now + 1);
         Assert.Equal(0, b.Total);
         Assert.Empty(b.Projects);
+        Assert.Equal(0, ledger.LastUsedAt);
     }
 }

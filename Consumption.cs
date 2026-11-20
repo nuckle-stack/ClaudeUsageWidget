@@ -102,10 +102,19 @@ public class UsageLedger
     private readonly Dictionary<string, Request> _requests = new();
     private readonly Dictionary<string, long> _offsets = new(StringComparer.OrdinalIgnoreCase);
     private Task? _refreshing;
+    private long _lastUsedAt;
 
     public UsageLedger(string claudeDir) => _claudeDir = claudeDir;
 
     public DateTime RefreshedAt { get; private set; }
+
+    /// <summary>
+    /// When the model last answered a Claude Code session on this machine
+    /// (unix seconds; 0 = not in the last week). A transcript's date says less:
+    /// an idle session appends bookkeeping lines to it (its title, its mode)
+    /// with nobody using it.
+    /// </summary>
+    public long LastUsedAt { get { lock (_gate) return _lastUsedAt; } }
 
     /// <summary>Reads new transcript lines in the background, unless that was done in the last maxAge.</summary>
     public Task RefreshAsync(TimeSpan maxAge)
@@ -155,6 +164,7 @@ public class UsageLedger
         {
             // The same message can be in two files (a resumed or forked session): count it once.
             for (var i = 0; i < ids.Count; i++) _requests.TryAdd(ids[i], found[i]);
+            foreach (var r in found) _lastUsedAt = Math.Max(_lastUsedAt, r.At);
             foreach (var old in _requests.Where(r => r.Value.At < now - KeepSeconds).Select(r => r.Key).ToList())
                 _requests.Remove(old);
         }

@@ -17,10 +17,11 @@ public class AutoHello
 
     private readonly State _state = Json.Load<State>(Paths.State);
     private Limits _ping = Json.Load<Limits>(Paths.Ping);
-    private long _activity;
-    private DateTime _activityChecked;
 
     public bool Running { get; private set; }
+
+    /// <summary>Consecutive failed hellos, and when the next try is allowed (unix seconds).</summary>
+    public (int Failures, long NextAttemptAt) Backoff => (_state.Attempts, _state.NextAttemptAt);
 
     /// <summary>The last hello's reading: the only one that says whether extra usage is on.</summary>
     public Limits Ping => _ping;
@@ -172,30 +173,16 @@ public class AutoHello
     }
 
     /// <summary>
-    /// When a Claude Code session (terminal or desktop app) last wrote to its
-    /// transcript, in unix seconds. Our own pings don't persist a session, so
-    /// they never count. Rescanned at most once a minute.
+    /// When Claude Code (terminal, desktop app or VS Code) last got an answer
+    /// from the model, in unix seconds; read at most once a minute. Not the
+    /// transcripts' dates: idle sessions touch theirs now and then, and taking
+    /// that for use sent pings all night, opening windows nobody had asked for.
+    /// Our own pings don't persist a session, so they never count.
     /// </summary>
-    private async Task<long> LastActivityAsync()
+    private static async Task<long> LastActivityAsync()
     {
-        if (DateTime.UtcNow - _activityChecked < TimeSpan.FromMinutes(1)) return _activity;
-        _activityChecked = DateTime.UtcNow;
-        _activity = await Task.Run(() =>
-        {
-            try
-            {
-                var projects = Path.Combine(Path.GetDirectoryName(Paths.Dir)!, "projects");
-                if (!Directory.Exists(projects)) return 0L;
-                var latest = Directory.EnumerateDirectories(projects)
-                    .SelectMany(d => new DirectoryInfo(d).EnumerateFiles("*.jsonl"))
-                    .Select(f => f.LastWriteTimeUtc)
-                    .DefaultIfEmpty(DateTime.UnixEpoch)
-                    .Max();
-                return new DateTimeOffset(latest, TimeSpan.Zero).ToUnixTimeSeconds();
-            }
-            catch { return 0L; }
-        });
-        return _activity;
+        await UsageLedger.Shared.RefreshAsync(TimeSpan.FromMinutes(1));
+        return UsageLedger.Shared.LastUsedAt;
     }
 
     /// <summary>A hello answers in seconds; this is for a slow first start, not a stuck one.</summary>
@@ -232,19 +219,7 @@ public class AutoHello
                 "--output-format", "stream-json", "--verbose",
             ];
             foreach (var a in args) psi.ArgumentList.Add(a);
-
-            // If the widget was launched from inside a Claude Code session, don't
-            // let the child think it is nested in that session.
-            foreach (var key in psi.Environment.Keys.ToList())
-                if (key.StartsWith("CLAUDECODE", StringComparison.OrdinalIgnoreCase) ||
-                    key.StartsWith("CLAUDE_CODE_", StringComparison.OrdinalIgnoreCase))
-                    psi.Environment.Remove(key);
-            // No update check, telemetry or plugin sync: none is needed for one
-            // message, and each can stall on a slow or filtered network. Plugin
-            // sync runs git, which with no window to ask in waits forever for
-            // credentials unless told not to ask.
-            psi.Environment["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1";
-            psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
+            PrepareEnvironment(psi);
 
             using var p = Process.Start(psi)!;
             p.StandardInput.Close();
@@ -311,7 +286,24 @@ public class AutoHello
         catch (JsonException) { return null; }
     }
 
-    private static void KillTree(Process p)
+    /// <summary>The environment for a claude.exe the widget starts in the background.</summary>
+    internal static void PrepareEnvironment(ProcessStartInfo psi)
+    {
+        // If the widget was launched from inside a Claude Code session, don't
+        // let the child think it is nested in that session.
+        foreach (var key in psi.Environment.Keys.ToList())
+            if (key.StartsWith("CLAUDECODE", StringComparison.OrdinalIgnoreCase) ||
+                key.StartsWith("CLAUDE_CODE_", StringComparison.OrdinalIgnoreCase))
+                psi.Environment.Remove(key);
+        // No update check, telemetry or plugin sync: none is needed for one
+        // message, and each can stall on a slow or filtered network. Plugin
+        // sync runs git, which with no window to ask in waits forever for
+        // credentials unless told not to ask.
+        psi.Environment["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1";
+        psi.Environment["GIT_TERMINAL_PROMPT"] = "0";
+    }
+
+    internal static void KillTree(Process p)
     {
         try { if (!p.HasExited) p.Kill(true); } catch { }
     }
@@ -405,6 +397,8 @@ public class AutoHello
 
     /// <summary>The Claude Code that worked last, tried first next time.</summary>
     private static string? _lastGood;
+
+    public static string? LastGood => _lastGood;
 
     /// <summary>
     /// Every Claude Code executable on this machine, best first, with where it
