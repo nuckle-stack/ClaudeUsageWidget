@@ -31,6 +31,9 @@ public partial class MainWindow : Window
     private Config _cfg = Json.Load<Config>(Paths.Config);
     private Limits _limits = new();
     private DateTime _limitsStamp;
+    /// <summary>What Claude Code's /usage last showed (see UsageScreen).</summary>
+    private Limits? _usage;
+    private DateTime _usageStamp, _usageReadAt;
     private static readonly Color NormalBack = Hex("#F015151A");
     private static readonly Color NormalBorder = Hex("#30FFFFFF");
     private readonly AlertTracker _alerts = new();
@@ -238,6 +241,7 @@ public partial class MainWindow : Window
     private async void Tick()
     {
         ReloadLimitsIfChanged();
+        await ReloadUsageScreenAsync();
         Ingest();
         Render();
         if (_cfg.AlwaysOnTop && !Topmost) Topmost = true;
@@ -245,7 +249,7 @@ public partial class MainWindow : Window
         await CheckAlertsAsync();
         await CheckFormatAsync();
 
-        await _hello.CheckAsync(_cfg, _limits);
+        await _hello.CheckAsync(_cfg, Current());
         Ingest();
         CheckLimitState();
         Render();
@@ -397,7 +401,7 @@ public partial class MainWindow : Window
     /// <summary>Records a new reading and announces any limit it crossed.</summary>
     private void Ingest()
     {
-        if (!_history.Add(_hello.Current(_limits))) return;
+        if (!_history.Add(Current())) return;
         var alerts = _history.PendingAlerts(_cfg.UsageAlerts);
         if (_history.PendingBudgetAlert(DateTime.Now, _cfg.UsageAlerts) is { } budget) alerts.Add(budget);
         foreach (var (title, text) in alerts)
@@ -662,9 +666,34 @@ public partial class MainWindow : Window
         catch { }
     }
 
+    /// <summary>
+    /// Re-reads Claude Code's global config when it changed, at most every 10
+    /// seconds: Claude Code rewrites it often, and it can be a few MB.
+    /// </summary>
+    private async Task ReloadUsageScreenAsync()
+    {
+        if (DateTime.UtcNow - _usageReadAt < TimeSpan.FromSeconds(10)) return;
+        _usageReadAt = DateTime.UtcNow;
+        var path = UsageScreen.ConfigFile;
+        try
+        {
+            var stamp = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : default;
+            if (stamp == _usageStamp) return;
+            var (ok, usage) = await Task.Run(() => (UsageScreen.TryLoad(path, out var u), u));
+            // Half-written: try again next time.
+            if (!ok) return;
+            _usageStamp = stamp;
+            _usage = usage;
+        }
+        catch { }
+    }
+
+    /// <summary>The limits shown: the freshest of the statusline and the hello, raised to what /usage last showed.</summary>
+    private Limits Current() => UsageScreen.Merge(_hello.Current(_limits), _usage);
+
     private void Render()
     {
-        var cur = _hello.Current(_limits);
+        var cur = Current();
         var t5 = RenderRow(cur.FiveHour, Fill5, Pct5, Time5, cur.Estimated);
         var t7 = RenderRow(cur.SevenDay, Fill7, Pct7, Time7, false);
         if (!cur.Estimated)
@@ -811,7 +840,7 @@ public partial class MainWindow : Window
         // Looking at the sessions is the acknowledgement: stop pulsing and reminding.
         _alerts.AckAll();
         UpdatePulse();
-        _sessions = new SessionsWindow(this, _cfg, _alerts, ForecastPanel, _history, () => _hello.Current(_limits));
+        _sessions = new SessionsWindow(this, _cfg, _alerts, ForecastPanel, _history, Current);
         _sessions.Closed += (_, _) => { _sessions = null; _sessionsClosed = DateTime.UtcNow; };
         _sessions.Show();
     }

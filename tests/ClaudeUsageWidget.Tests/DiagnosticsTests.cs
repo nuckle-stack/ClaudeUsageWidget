@@ -172,6 +172,7 @@ public class DiagnosticsTests
         Assert.Contains("Statusline (limits.json): há 2 min", text);
         Assert.Contains("5h 22%", text);
         Assert.Contains("Último hello (ping.json): nenhum.", text);
+        Assert.Contains("Último /usage (.claude.json): nenhum", text);
         Assert.Contains("Hello: 2 falha(s) seguidas", text);
         Assert.Contains("Abertas: 3 (CLI 2, Desktop 1) · à tua espera: 1", text);
         Assert.Contains("Atalho: Ctrl+Alt+C (ativo)", text);

@@ -68,6 +68,9 @@ USAR
     espera há mais tempo; outra vez, para a seguinte. Sem nenhuma à espera,
     salta para a última sessão que mudou e, a partir de uma sessão, para a
     seguinte. Muda-se (ou desliga-se) nas Definições.
+  - Os números vêm do próprio Claude Code, a cada resposta no terminal (ou de
+    um hello). O /usage do Claude Code arredonda de outra maneira e pode
+    mostrar mais 1%; sempre que o abres, o widget passa a contar com esse valor.
   - Se um limite esgotar e o Claude continuar com uso extra (pago à parte),
     o widget avisa. Quando um limite esgotado renova, também avisa.
   - "Hoje: 9% de 14% do limite semanal", no topo da lista de sessões: o que

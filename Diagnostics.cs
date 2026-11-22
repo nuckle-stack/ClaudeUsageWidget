@@ -82,6 +82,10 @@ public static class Diagnostics
         Line("Último hello (ping.json): " + (live.Ping.UpdatedAt > 0
             ? $"{Ago(live.Ping.UpdatedAt, now)} · {Windows(live.Ping)}{(live.Ping.Estimated ? " · estimativa, sem limites na resposta" : "")}{Overage(live.Ping.Overage)}"
             : "nenhum."));
+        Line("Último /usage (.claude.json): " + (!UsageScreen.TryLoad(UsageScreen.ConfigFile, out var shown)
+            ? "não se consegue ler."
+            : shown is null ? "nenhum (aparece depois de abrir /usage no Claude Code)."
+            : $"{Ago(shown.UpdatedAt, now)} · {Windows(shown)}"));
         Line("Hello: " + (live.HelloRunning ? "a correr agora."
             : live.Backoff.Failures == 0 ? "sem falhas."
             : $"{live.Backoff.Failures} falha(s) seguidas; próxima tentativa {At(live.Backoff.NextAttemptAt)}."));

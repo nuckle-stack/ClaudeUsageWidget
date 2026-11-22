@@ -68,6 +68,9 @@ Cobrem:
 
 - a previsão do ritmo de uso e os avisos de 80/95%, o agendamento do auto-hello
   e a leitura da saída do `claude -p` (com uma linha `rate_limit_event` real);
+- o que o `/usage` mostrou da última vez, que o Claude Code guarda no
+  `.claude.json`: arredonda de outra maneira que o statusline e pode ir 1%
+  acima, por isso o widget fica com o mais alto da mesma janela;
 - os títulos das sessões, os lembretes dos avisos, o consumo por projeto, o
   contexto ocupado de cada sessão (com e sem o tamanho da janela do
   statusline), o que cada sessão está a fazer e as sessões recentes e o comando
