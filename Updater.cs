@@ -193,10 +193,12 @@ public class Updater
         try
         {
             var temp = new DirectoryInfo(Path.GetTempPath());
-            foreach (var item in temp.EnumerateFileSystemInfos("ClaudeUsageWidget-update-*"))
+            foreach (var item in temp.EnumerateFileSystemInfos("ClaudeUsageWidget-update-*").ToList())
             {
                 if (DateTime.UtcNow - item.LastWriteTimeUtc < TimeSpan.FromHours(1)) continue;
-                if (item is DirectoryInfo d) d.Delete(recursive: true); else item.Delete();
+                // One in use (an installer still running from it) does not keep the others.
+                try { if (item is DirectoryInfo d) d.Delete(recursive: true); else item.Delete(); }
+                catch { }
             }
         }
         catch { }

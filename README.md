@@ -40,7 +40,10 @@ Até à 1.8 o widget era um exe único de 66 MB, comprimido. Em cada versão nov
 o primeiro arranque escrevia parte do .NET em `%TEMP%\.net` e, num PC de empresa,
 o antivírus retinha-o uns minutos antes de o widget aparecer. Agora, de uma
 versão para a seguinte, só mudam o exe e a dll, que são pequenos. O `runtime\`
-é igual e a instalação deixa-o como está.
+é igual e a instalação deixa-o como está. Quando o .NET desta máquina é
+atualizado, a versão seguinte leva um `runtime\` novo inteiro (e um primeiro
+arranque possivelmente lento noutros PCs). Por isso convém não publicar logo
+a seguir a uma atualização do .NET só por publicar.
 
 ## Instalar
 

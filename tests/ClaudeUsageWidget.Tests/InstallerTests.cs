@@ -288,6 +288,37 @@ public class InstallerTests
     }
 
     [Fact]
+    public void An_install_cut_short_has_copied_dotnet_and_left_the_old_exe()
+    {
+        var installed = Path.Combine(Isolation.Root, "installed-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(installed);
+        var exe = Path.Combine(installed, "ClaudeUsageWidget.exe");
+        File.WriteAllText(exe, "old single-file widget");
+
+        // Held so that it can be neither replaced nor renamed.
+        using (new FileStream(exe, FileMode.Open, FileAccess.Read, FileShare.None))
+            Assert.ThrowsAny<IOException>(() => Installer.CopyPackage(Package(), installed));
+
+        Assert.Equal("old single-file widget", File.ReadAllText(exe));
+        Assert.True(File.Exists(Path.Combine(installed, @"runtime\shared\Microsoft.WindowsDesktop.App\10.0.15\wpfgfx_cor3.dll")));
+        Assert.True(File.Exists(Path.Combine(installed, "ClaudeUsageWidget.dll")));
+    }
+
+    [Fact]
+    public void A_file_missing_from_the_package_stays_installed()
+    {
+        var installed = Path.Combine(Isolation.Root, "installed-" + Guid.NewGuid().ToString("N"));
+        Installer.CopyPackage(Package(), installed);
+
+        // The antivirus took one out of the unpacked zip: the installed one is not removed for that.
+        var next = Package();
+        File.Delete(Path.Combine(next, @"runtime\shared\Microsoft.NETCore.App\10.0.15\coreclr.dll"));
+        Installer.CopyPackage(next, installed);
+
+        Assert.True(File.Exists(Path.Combine(installed, @"runtime\shared\Microsoft.NETCore.App\10.0.15\coreclr.dll")));
+    }
+
+    [Fact]
     public void A_newer_dotnet_replaces_the_old_one()
     {
         var installed = Path.Combine(Isolation.Root, "installed-" + Guid.NewGuid().ToString("N"));

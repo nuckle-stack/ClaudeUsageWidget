@@ -96,14 +96,18 @@ public static class Installer
         var exe = Path.Combine(o.Dir, ExeName);
         var feed = Path.Combine(o.Dir, FeedName);
         Directory.CreateDirectory(o.Dir);
-        CleanUpOld(o.Dir);
-        StopWidget(exe);
-        RemoveOldExtractions();
-        if (!SamePath(package, o.Dir))
+        // Off the install window's thread: closing the old widget can take
+        // seconds, and an antivirus looks at each new file as it is written;
+        // a window that stops answering meanwhile invites closing it halfway.
+        await Task.Run(() =>
         {
+            CleanUpOld(o.Dir);
+            StopWidget(exe);
+            RemoveOldExtractions();
+            if (SamePath(package, o.Dir)) return;
             var (copied, kept) = CopyPackage(package, o.Dir);
             Log.Write($"Instalação: {copied} ficheiro(s) copiados, {kept} já estavam iguais.");
-        }
+        });
         File.WriteAllText(Path.Combine(o.Dir, Marker), "Instalado pelo Claude Usage Widget. Este ficheiro marca a pasta onde ele está instalado.\n");
         step($"Widget: {exe}");
 
@@ -209,7 +213,10 @@ public static class Installer
     {
         var folders = new[] { dir, Paths.Dir }.Where(Directory.Exists).ToList();
         if (folders.Count == 0) return;
-        var command = "ping -n 4 127.0.0.1 >nul & " + string.Join(" & ", folders.Select(f => $"rmdir /s /q \"{f}\""));
+        // A second go a few seconds on: a slow exit keeps .NET's files in use.
+        var remove = string.Join(" & ", folders.Select(f => $"rmdir /s /q \"{f}\""));
+        var retry = string.Join(" & ", folders.Select(f => $"if exist \"{f}\" rmdir /s /q \"{f}\""));
+        var command = $"ping -n 4 127.0.0.1 >nul & {remove} & ping -n 6 127.0.0.1 >nul & {retry}";
         Process.Start(new ProcessStartInfo("cmd.exe", $"/d /c \"{command}\"") { UseShellExecute = false, CreateNoWindow = true });
     }
 
@@ -429,13 +436,20 @@ public static class Installer
     /// the same content is left alone: .NET does not change from one version
     /// of the widget to the next, nor does the feed until its code does (it
     /// builds to the same bytes, only newer), and every file written anew is
-    /// one more for the antivirus to look at before it runs. Whatever runtime\
-    /// holds that the package does not (an older .NET) goes.
+    /// one more for the antivirus to look at before it runs. .NET goes first
+    /// and the exe last: an install cut short (a file held by the antivirus, a
+    /// full disk) leaves the old exe, which still runs, and never a new one
+    /// without its .NET. Then a folder of runtime\ the package does not have
+    /// (an older .NET) goes; single files never do, as an antivirus may have
+    /// taken one out of the unpacked zip.
     /// </summary>
     internal static (int Copied, int Kept) CopyPackage(string package, string dir)
     {
         var (copied, kept) = (0, 0);
-        var files = PackageFiles(package);
+        var files = PackageFiles(package)
+            .OrderBy(f => f.StartsWith(RuntimeDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ? 0
+                : f.Equals(ExeName, StringComparison.OrdinalIgnoreCase) ? 2 : 1)
+            .ToList();
         foreach (var rel in files)
         {
             var (from, to) = (Path.Combine(package, rel), Path.Combine(dir, rel));
@@ -451,16 +465,11 @@ public static class Installer
             copied++;
         }
 
-        var runtime = Path.Combine(dir, RuntimeDir);
-        if (Directory.Exists(runtime))
-        {
-            var wanted = files.Select(f => Path.GetFullPath(Path.Combine(dir, f))).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var f in Directory.EnumerateFiles(runtime, "*", SearchOption.AllDirectories).ToList())
-                if (!wanted.Contains(Path.GetFullPath(f)))
-                    try { File.Delete(f); } catch { }
-            foreach (var d in Directory.EnumerateDirectories(runtime, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length))
-                try { if (!Directory.EnumerateFileSystemEntries(d).Any()) Directory.Delete(d); } catch { }
-        }
+        var (runtime, packaged) = (Path.Combine(dir, RuntimeDir), Path.Combine(package, RuntimeDir));
+        if (Directory.Exists(runtime) && Directory.Exists(packaged))
+            foreach (var d in Directory.EnumerateDirectories(runtime, "*", SearchOption.AllDirectories).ToList())
+                if (Directory.Exists(d) && !Directory.Exists(Path.Combine(packaged, Path.GetRelativePath(runtime, d))))
+                    try { Directory.Delete(d, recursive: true); } catch { }
         return (copied, kept);
     }
 
