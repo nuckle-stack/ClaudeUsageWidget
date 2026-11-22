@@ -75,10 +75,13 @@ public partial class MainWindow : Window
         _updateTimer.Tick += async (_, _) =>
         {
             _updateTimer.Interval = TimeSpan.FromHours(6);
+            // An update restarts the widget right away, too soon to remove
+            // what it unpacked (some 250 MB); the widget may then run for days.
+            _ = Task.Run(Updater.CleanUp);
             await CheckUpdatesAsync(manual: false);
         };
         _updateTimer.Start();
-        Updater.CleanUp();
+        _ = Task.Run(Updater.CleanUp);
 
         // How long it took to appear: on a slow or busy PC the first start of
         // a new version (unpacked, scanned by the antivirus) can take a while.
