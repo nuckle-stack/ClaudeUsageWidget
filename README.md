@@ -89,7 +89,9 @@ Cobrem:
   e a leitura da saída do `claude -p` (com uma linha `rate_limit_event` real);
 - o que o `/usage` mostrou da última vez, que o Claude Code guarda no
   `.claude.json`: arredonda de outra maneira que o statusline e pode ir 1%
-  acima, por isso o widget fica com o mais alto da mesma janela;
+  acima, por isso o widget fica com o mais alto da mesma janela; e a
+  repartição da semana que vem com ele (Claude Code, claude.ai, Cowork), que
+  fica com o resumo dessa semana;
 - os títulos das sessões, os lembretes dos avisos, o consumo por projeto, o
   contexto ocupado de cada sessão (com e sem o tamanho da janela do
   statusline), o que cada sessão está a fazer e as sessões recentes e o comando

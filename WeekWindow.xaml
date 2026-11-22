@@ -43,6 +43,13 @@
             <TextBlock Text="Por dia" Foreground="#99FFFFFF" FontWeight="SemiBold" Margin="0,0,0,3"/>
             <ItemsControl x:Name="DayList" ItemTemplate="{StaticResource BarRow}" Margin="0,0,0,12"/>
 
+            <StackPanel x:Name="SourceBox">
+                <TextBlock Text="De onde veio" Foreground="#99FFFFFF" FontWeight="SemiBold" Margin="0,0,0,3"
+                           ToolTip="A repartição que o /usage do Claude Code mostra. Ao contrário dos projetos, inclui o claude.ai, o Cowork e o Claude Code noutros PCs."/>
+                <ItemsControl x:Name="SourceList" ItemTemplate="{StaticResource BarRow}"/>
+                <TextBlock x:Name="SourceWhen" Foreground="#80FFFFFF" FontSize="10" Margin="0,2,0,12" TextWrapping="Wrap"/>
+            </StackPanel>
+
             <StackPanel x:Name="ProjectBox">
                 <TextBlock Text="Projetos neste PC" Foreground="#99FFFFFF" FontWeight="SemiBold" Margin="0,0,0,3"
                            ToolTip="Reparte o uso do Claude Code neste PC pelo custo equivalente na API; não inclui o claude.ai nem outros PCs."/>

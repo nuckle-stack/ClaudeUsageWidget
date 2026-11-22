@@ -51,7 +51,7 @@ public partial class WeekWindow : Window
         TabLast.Visibility = _last is null ? Visibility.Collapsed : Visibility.Visible;
 
         var any = week is not null;
-        foreach (var e in new UIElement[] { Total, Compare, (UIElement)TotalBar.Parent, DayList, ProjectBox, FiveHour })
+        foreach (var e in new UIElement[] { Total, Compare, (UIElement)TotalBar.Parent, DayList, SourceBox, ProjectBox, FiveHour })
             e.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
         Empty.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
         Note.Visibility = Visibility.Collapsed;
@@ -75,6 +75,8 @@ public partial class WeekWindow : Window
             WeekReport.DayLabel(d.Date), BarMax * d.Percent / top, d == heaviest ? Orange : Blue, WeekReport.Pct(d.Percent),
             $"{WeekReport.DayName(d.Date)}, {d.Date:dd/MM}: {WeekReport.Pct(d.Percent)} do limite semanal")).ToList();
 
+        RenderSources(week, now);
+
         ProjectBox.Visibility = week.Projects.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         ProjectList.ItemsSource = week.Projects.Select(p => new BarRow(
             p.Name, BarMax * p.Share, Blue, WeekReport.Pct(p.Share * 100), $"{p.Name}: {WeekReport.Pct(p.Share * 100)} do uso neste PC")).ToList();
@@ -90,6 +92,28 @@ public partial class WeekWindow : Window
             Note.Text = "O widget esteve desligado no início da semana: o primeiro dia que viu inclui o uso de antes.";
             Note.Visibility = Visibility.Visible;
         }
+    }
+
+    /// <summary>
+    /// /usage's breakdown, when it was opened that week; for the week running
+    /// without one, how to get it. It only changes when /usage is opened.
+    /// </summary>
+    private void RenderSources(WeekSummary week, long now)
+    {
+        var running = week.ResetAt > now;
+        SourceBox.Visibility = week.Sources.Count > 0 || running ? Visibility.Visible : Visibility.Collapsed;
+        if (week.Sources.Count == 0)
+        {
+            SourceList.ItemsSource = null;
+            SourceWhen.Text = "Abre o /usage no Claude Code para ver aqui quanto veio do claude.ai, do Cowork e de outros PCs.";
+            return;
+        }
+        var top = Math.Max(1, week.Sources.Max(s => s.Points));
+        SourceList.ItemsSource = week.Sources.Select(s => new BarRow(
+            s.Name, BarMax * s.Points / top, Blue, WeekReport.Pct(s.Points),
+            $"{s.Name}: {WeekReport.Pct(s.Points)} do limite semanal ({WeekReport.Pct(s.Share)} do uso da semana)")).ToList();
+        SourceWhen.Text = $"Segundo o /usage de {When(week.SourcesAsOf)}." +
+                          (running && now - week.SourcesAsOf > 3600 ? " Abre-o outra vez para atualizar." : "");
     }
 
     private static string When(long unix) =>

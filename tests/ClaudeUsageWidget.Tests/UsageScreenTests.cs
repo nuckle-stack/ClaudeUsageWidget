@@ -20,7 +20,17 @@ public class UsageScreenTests
               "five_hour": { "utilization": 5, "resets_at": "2026-11-23T02:10:00.948015+00:00", "used_dollars": null },
               "seven_day": { "utilization": 30, "resets_at": "2026-11-24T18:00:00.948035+00:00", "used_dollars": null },
               "seven_day_opus": null,
-              "extra_usage": { "is_enabled": true, "utilization": null }
+              "extra_usage": { "is_enabled": true, "utilization": null },
+              "seven_day_breakdown": {
+                "as_of": "2026-11-22T21:31:55.690515+00:00",
+                "window_started_at": "2026-11-17T18:00:00.948035+00:00",
+                "rows": [
+                  { "key": "claude_code", "display_name": "Claude Code", "percent": 94, "percent_of_limit": 28 },
+                  { "key": "chat", "display_name": "Chats", "percent": 0, "percent_of_limit": 0 },
+                  { "key": "cowork", "display_name": "Cowork", "percent": 6, "percent_of_limit": 2 },
+                  { "key": "other", "display_name": "Other", "percent": 0, "percent_of_limit": 0 }
+                ]
+              }
             }
           }
         }
@@ -49,6 +59,41 @@ public class UsageScreenTests
         Assert.Equal(Five, u.FiveHour.ResetsAt);
         Assert.Equal(30, u.SevenDay!.UsedPercentage);
         Assert.Equal(Week, u.SevenDay.ResetsAt);
+    }
+
+    [Fact]
+    public void ParseWeek_reads_where_the_week_went()
+    {
+        using var doc = JsonDocument.Parse(Config);
+        var w = UsageScreen.ParseWeek(doc.RootElement)!;
+
+        Assert.Equal(Week - 7 * 86400, w.Start);
+        Assert.Equal(1795383115, w.AsOf);
+        // Nothing went to the chats or elsewhere: left out.
+        Assert.Equal([("claude_code", "Claude Code", 28.0, 94.0), ("cowork", "Cowork", 2.0, 6.0)],
+            w.Rows.Select(r => (r.Key, r.Name, r.Points, r.Share)));
+    }
+
+    private static WeekSources? Sources(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return UsageScreen.ParseWeek(doc.RootElement);
+    }
+
+    [Fact]
+    public void ParseWeek_is_null_for_another_account_or_without_a_breakdown()
+    {
+        Assert.Null(Sources(Config.Replace("\"accountUuid\": \"acc-1\", \"organizationUuid\"", "\"accountUuid\": \"acc-2\", \"organizationUuid\"")));
+        Assert.Null(Sources(Config.Replace("\"seven_day_breakdown\"", "\"something_else\"")));
+        Assert.Null(Sources("""{"cachedUsageUtilization": {"fetchedAtMs": 1, "utilization": {"seven_day_breakdown": {"as_of": "2026-11-22T21:31:55Z", "window_started_at": "2026-11-17T18:00:00Z", "rows": []}}}}"""));
+        Assert.Null(Sources("""{"cachedUsageUtilization": {"fetchedAtMs": 1, "utilization": {"seven_day_breakdown": {"as_of": null, "rows": [{"key": "chat", "percent": 5, "percent_of_limit": 1}]}}}}"""));
+    }
+
+    [Fact]
+    public void ParseWeek_names_an_unknown_place_as_usage_does()
+    {
+        var w = Sources("""{"cachedUsageUtilization": {"fetchedAtMs": 1, "utilization": {"seven_day_breakdown": {"as_of": "2026-11-22T21:31:55Z", "window_started_at": "2026-11-17T18:00:00Z", "rows": [{"key": "chat", "display_name": "Chats", "percent": 40, "percent_of_limit": 4}, {"key": "new_thing", "display_name": "New thing", "percent": 60, "percent_of_limit": 6}]}}}}""")!;
+        Assert.Equal(["New thing", "Conversas (claude.ai)"], w.Rows.Select(r => r.Name));
     }
 
     [Fact]

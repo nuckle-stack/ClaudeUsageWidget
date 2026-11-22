@@ -145,6 +145,45 @@ public class WeekTests
         Assert.Single(log.Weeks);
     }
 
+    // ---- where the use came from, by /usage ------------------------------------------------
+
+    private static WeekSources Sources(long start, long asOf) =>
+        new(start, asOf, [new("claude_code", "Claude Code", 28, 94), new("cowork", "Cowork", 2, 6)]);
+
+    [Fact]
+    public void Usage_breakdown_goes_with_its_own_week_and_only_a_newer_one_replaces_it()
+    {
+        var week = WeekReport.Build(AWeek, Reset, Use(), Unix(Local(22, 21)))!;
+        Assert.False(WeekReport.Attach(week, Sources(LastReset - 7 * 86400, Unix(Local(16, 12)))));   // the week before's
+        Assert.Empty(week.Sources);
+
+        // /usage's week starts a fraction of a second after the reset.
+        Assert.True(WeekReport.Attach(week, Sources(LastReset + 1, Unix(Local(22, 21)))));
+        Assert.Equal(["Claude Code", "Cowork"], week.Sources.Select(s => s.Name));
+        Assert.False(WeekReport.Attach(week, Sources(LastReset, Unix(Local(20, 9)))));   // older
+        Assert.Equal(Unix(Local(22, 21)), week.SourcesAsOf);
+    }
+
+    [Fact]
+    public void The_message_says_what_went_outside_Claude_Code()
+    {
+        var week = new WeekSummary { Used = 30, Sources = Sources(LastReset, 1).Rows };
+        Assert.Equal("Usaste 30% do limite semanal. Fora do Claude Code: 2% (Cowork).", WeekReport.Message(week, null));
+    }
+
+    [Fact]
+    public void A_closed_week_keeps_what_usage_said_of_it()
+    {
+        var path = Path.Combine(Isolation.Root, $"weeks-{Guid.NewGuid():N}.json");
+        var samples = AWeek.Append(S(Local(24, 18, 30), 1, r7: Reset + 7 * 86400)).ToList();
+        new WeekLog(path).Close(samples, NoUse, Unix(Local(24, 18, 31)), Sources(LastReset, Unix(Local(24, 9))));
+
+        var kept = new WeekLog(path).Weeks.Single();
+        Assert.Equal(["Claude Code", "Cowork"], kept.Sources.Select(s => s.Name));
+        Assert.Equal(2, kept.Sources[1].Points);
+        Assert.Equal(Unix(Local(24, 9)), kept.SourcesAsOf);
+    }
+
     [Fact]
     public void Only_the_last_12_weeks_are_kept()
     {

@@ -22,6 +22,12 @@ public class WeekSummary
     public int FiveHourMaxed { get; set; }
     /// <summary>The widget was off at the start of the week: the first days it saw carry what came before.</summary>
     public bool Gaps { get; set; }
+    /// <summary>
+    /// Where the use came from, by /usage (Claude Code on any PC, claude.ai,
+    /// Cowork...), as of SourcesAsOf; empty when /usage was not opened that week.
+    /// </summary>
+    public List<SourceUse> Sources { get; set; } = new();
+    public long SourcesAsOf { get; set; }
 
     [JsonIgnore] public long Start => ResetAt - 7 * 86400;
     [JsonIgnore] public DayUse? Heaviest => Days.Where(d => d.Percent >= 0.5).MaxBy(d => d.Percent);
@@ -81,6 +87,18 @@ public static class WeekReport
         };
     }
 
+    /// <summary>
+    /// Gives the week /usage's breakdown when it is that week's (it started
+    /// when the week did) and newer than the one it has. True when it did.
+    /// </summary>
+    public static bool Attach(WeekSummary week, WeekSources? sources)
+    {
+        if (sources is null || Math.Abs(sources.Start - week.Start) > 3600 || sources.AsOf <= week.SourcesAsOf) return false;
+        week.Sources = sources.Rows;
+        week.SourcesAsOf = sources.AsOf;
+        return true;
+    }
+
     /// <summary>The notification when a week ends.</summary>
     public static string Message(WeekSummary week, WeekSummary? previous)
     {
@@ -89,6 +107,8 @@ public static class WeekReport
         text += ".";
         if (week.Heaviest is { } day) text += $" Dia mais pesado: {DayName(day.Date)} ({Pct(day.Percent)}).";
         if (week.Projects.FirstOrDefault(p => p.Name != "outros") is { } top) text += $" Mais usado: {top.Name} ({Pct(top.Share * 100)}).";
+        var outside = week.Sources.Where(s => s.Key != "claude_code" && s.Points >= 0.5).ToList();
+        if (outside.Count > 0) text += $" Fora do Claude Code: {Pct(outside.Sum(s => s.Points))} ({string.Join(", ", outside.Select(s => s.Name))}).";
         if (week.FiveHourMaxed > 0) text += week.FiveHourMaxed == 1 ? " A janela de 5h esgotou uma vez." : $" A janela de 5h esgotou {week.FiveHourMaxed} vezes.";
         return text;
     }
@@ -154,13 +174,15 @@ public class WeekLog
     /// ended, once. Returns it when it just ended (to announce); a week found
     /// ended long ago (the widget was off) is kept without a word.
     /// </summary>
-    public WeekSummary? Close(IReadOnlyList<Sample> samples, Func<long, long, Breakdown> use, long now)
+    public WeekSummary? Close(IReadOnlyList<Sample> samples, Func<long, long, Breakdown> use, long now, WeekSources? sources = null)
     {
         var ended = Unsummed(samples, now);
         if (ended == 0) return null;
 
         var week = WeekReport.Build(samples, ended, use(ended - 7 * 86400, ended), now);
         if (week is null) return null;
+        // What /usage last said of it, if it was opened that week: it now shows the new one.
+        WeekReport.Attach(week, sources);
         _file.Weeks.Add(week);
         _file.Weeks.Sort((a, b) => a.ResetAt.CompareTo(b.ResetAt));
         if (_file.Weeks.Count > Keep) _file.Weeks.RemoveRange(0, _file.Weeks.Count - Keep);

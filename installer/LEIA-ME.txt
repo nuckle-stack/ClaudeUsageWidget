@@ -56,7 +56,9 @@ USAR
   - "Resumo da semana" (botão direito no widget): quanto do limite semanal
     usaste, quanto gastou cada dia, que projetos o gastaram e quantas vezes a
     janela de 5h esgotou; também a semana anterior. Quando a semana renova, o
-    widget mostra o resumo da que acabou.
+    widget mostra o resumo da que acabou. Se abriste o /usage do Claude Code
+    nessa semana, mostra também de onde veio o uso (Claude Code, conversas no
+    claude.ai, Cowork), incluindo o que os projetos deste PC não veem.
   - "Recentes", no fim da lista de sessões: as sessões do terminal e do VS
     Code dos últimos 7 dias que já fechaste. Um clique abre um separador novo
     do Windows Terminal (ou uma consola) na pasta dela, com a conversa

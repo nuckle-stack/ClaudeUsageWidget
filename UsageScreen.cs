@@ -13,6 +13,16 @@ namespace ClaudeUsageWidget;
 /// (cachedUsageUtilization), so the widget can agree with /usage without
 /// asking anything itself. It only changes when someone opens /usage.
 /// </summary>
+/// <summary>
+/// One place the weekly limit went, as /usage breaks it down: Claude Code (on
+/// any PC), the chats on claude.ai, Cowork... Points of the weekly limit, and
+/// share of the week's use (0..100).
+/// </summary>
+public record SourceUse(string Key, string Name, double Points, double Share);
+
+/// <summary>/usage's breakdown of the week that started at Start (unix seconds), as of AsOf.</summary>
+public record WeekSources(long Start, long AsOf, List<SourceUse> Rows);
+
 public static class UsageScreen
 {
     /// <summary>Claude Code's global config: in CLAUDE_CONFIG_DIR when set, else ~/.claude.json.</summary>
@@ -26,15 +36,19 @@ public static class UsageScreen
     /// parsed (Claude Code may be writing it): keep what was read before.
     /// True with null when there is none.
     /// </summary>
-    public static bool TryLoad(string path, out Limits? usage)
+    public static bool TryLoad(string path, out Limits? usage) => TryLoad(path, out usage, out _);
+
+    /// <summary>The same, with /usage's breakdown of the week.</summary>
+    public static bool TryLoad(string path, out Limits? usage, out WeekSources? week)
     {
-        usage = null;
+        (usage, week) = (null, null);
         try
         {
             if (!File.Exists(path)) return true;
             using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             using var doc = JsonDocument.Parse(fs);
             usage = Parse(doc.RootElement);
+            week = ParseWeek(doc.RootElement);
             return true;
         }
         catch
@@ -43,7 +57,8 @@ public static class UsageScreen
         }
     }
 
-    public static Limits? Parse(JsonElement root)
+    /// <summary>/usage's last answer (its "utilization" object) and when it came, for this account.</summary>
+    private static (JsonElement Answer, double FetchedMs)? Answer(JsonElement root)
     {
         if (root.ValueKind != JsonValueKind.Object ||
             !root.TryGetProperty("cachedUsageUtilization", out var cache) || cache.ValueKind != JsonValueKind.Object)
@@ -56,14 +71,62 @@ public static class UsageScreen
             return null;
 
         if (!cache.TryGetProperty("fetchedAtMs", out var fetched) || fetched.ValueKind != JsonValueKind.Number || !fetched.TryGetDouble(out var ms) ||
-            !cache.TryGetProperty("utilization", out var windows) || windows.ValueKind != JsonValueKind.Object)
+            !cache.TryGetProperty("utilization", out var answer) || answer.ValueKind != JsonValueKind.Object)
             return null;
+        return (answer, ms);
+    }
+
+    public static Limits? Parse(JsonElement root)
+    {
+        if (Answer(root) is not var (windows, ms)) return null;
 
         var five = Window(windows, "five_hour");
         var week = Window(windows, "seven_day");
         if (five is null && week is null) return null;
         return new Limits { UpdatedAt = (long)(ms / 1000), FiveHour = five, SevenDay = week };
     }
+
+    /// <summary>
+    /// seven_day_breakdown: {"as_of", "window_started_at", "rows": [{"key":
+    /// "cowork", "display_name": "Cowork", "percent": 6, "percent_of_limit":
+    /// 2}]}. The places nothing went to are left out; null when there is none.
+    /// </summary>
+    public static WeekSources? ParseWeek(JsonElement root)
+    {
+        if (Answer(root) is not var (answer, _) ||
+            !answer.TryGetProperty("seven_day_breakdown", out var b) || b.ValueKind != JsonValueKind.Object ||
+            Time(b, "window_started_at") is not { } start || Time(b, "as_of") is not { } asOf ||
+            !b.TryGetProperty("rows", out var rows) || rows.ValueKind != JsonValueKind.Array)
+            return null;
+
+        var list = new List<SourceUse>();
+        foreach (var r in rows.EnumerateArray())
+        {
+            if (r.ValueKind != JsonValueKind.Object) continue;
+            var (points, share) = (Number(r, "percent_of_limit"), Number(r, "percent"));
+            if (points <= 0 && share <= 0) continue;
+            var key = Text(r, "key") ?? "";
+            list.Add(new SourceUse(key, SourceName(key, Text(r, "display_name") ?? ""), points, share));
+        }
+        return list.Count == 0 ? null : new WeekSources(start, asOf, list.OrderByDescending(s => s.Points).ThenByDescending(s => s.Share).ToList());
+    }
+
+    /// <summary>The names /usage gives, in Portuguese where they are known.</summary>
+    private static string SourceName(string key, string shown) => key switch
+    {
+        "claude_code" => "Claude Code",
+        "chat" => "Conversas (claude.ai)",
+        "cowork" => "Cowork",
+        "other" => "Outros",
+        _ => shown.Length > 0 ? shown : key,
+    };
+
+    private static double Number(JsonElement e, string name) =>
+        e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out var d) ? d : 0;
+
+    private static long? Time(JsonElement e, string name) =>
+        Text(e, name) is { } s && DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var t)
+            ? t.ToUnixTimeSeconds() : null;
 
     /// <summary>
     /// The statusline's or the hello's reading, raised to what /usage showed

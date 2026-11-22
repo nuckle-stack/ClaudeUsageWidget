@@ -33,6 +33,8 @@ public partial class MainWindow : Window
     private DateTime _limitsStamp;
     /// <summary>What Claude Code's /usage last showed (see UsageScreen).</summary>
     private Limits? _usage;
+    /// <summary>And its breakdown of the week: Claude Code, claude.ai, Cowork...</summary>
+    private WeekSources? _usageWeek;
     private DateTime _usageStamp, _usageReadAt;
     private static readonly Color NormalBack = Hex("#F015151A");
     private static readonly Color NormalBorder = Hex("#30FFFFFF");
@@ -293,7 +295,7 @@ public partial class MainWindow : Window
         {
             // The use by project comes from the transcripts: read what is new first.
             await UsageLedger.Shared.RefreshAsync(TimeSpan.FromMinutes(1));
-            if (_weeks.Close(_history.Samples.ToList(), UsageLedger.Shared.Summarize, now) is not { } week) return;
+            if (_weeks.Close(_history.Samples.ToList(), UsageLedger.Shared.Summarize, now, _usageWeek) is not { } week) return;
             var text = WeekReport.Message(week, _weeks.Before(week.ResetAt));
             Log.Write($"Semana fechada{(Quiet ? " [silenciado]" : "")}: {text}");
             if (Quiet) return;
@@ -311,6 +313,7 @@ public partial class MainWindow : Window
         if (_weekWindow is not null) return;
         if (!IsVisible) Show();
         await UsageLedger.Shared.RefreshAsync(TimeSpan.FromSeconds(20));
+        await ReloadUsageScreenAsync();
         if (_weekWindow is not null) return;
 
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -318,6 +321,10 @@ public partial class MainWindow : Window
         var resetAt = samples.LastOrDefault(s => s.R7 > 0)?.R7 ?? 0;
         var current = resetAt > 0 ? WeekReport.Build(samples, resetAt, UsageLedger.Shared.Summarize(resetAt - 7 * 86400, now + 1), now) : null;
         var last = resetAt > 0 ? _weeks.Before(resetAt) : _weeks.Weeks.LastOrDefault();
+        // /usage's breakdown goes with the week it is of: this one, or the last
+        // when /usage has not been opened since the reset.
+        foreach (var week in new[] { current, last })
+            if (week is not null) WeekReport.Attach(week, _usageWeek);
 
         _weekWindow = new WeekWindow(this, current, last, _weeks, showLast);
         _weekWindow.Closed += (_, _) => _weekWindow = null;
@@ -682,11 +689,12 @@ public partial class MainWindow : Window
         {
             var stamp = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : default;
             if (stamp == _usageStamp) return;
-            var (ok, usage) = await Task.Run(() => (UsageScreen.TryLoad(path, out var u), u));
+            var (ok, usage, week) = await Task.Run(() => (UsageScreen.TryLoad(path, out var u, out var w), u, w));
             // Half-written: try again next time.
             if (!ok) return;
             _usageStamp = stamp;
             _usage = usage;
+            _usageWeek = week;
         }
         catch { }
     }
