@@ -16,8 +16,8 @@ public record UpdateInfo(Version Version, string ZipUrl, long Size, string? Sha2
 /// nobody has to pass zips around. It asks GitHub (no login: the repository is
 /// public) for the latest release now and then; when it is newer, the user is
 /// told once, and on their go-ahead the zip is downloaded, checked against the
-/// SHA256 GitHub lists for it, unpacked, and its own install.ps1 run. The
-/// installer replaces the exe and the scripts, keeps the settings, and starts
+/// SHA256 GitHub lists for it, unpacked, and the new exe's installer run. The
+/// installer replaces the files that changed, keeps the settings, and starts
 /// the new widget.
 /// </summary>
 public class Updater

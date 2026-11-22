@@ -32,7 +32,7 @@ if (-not (Test-Path -LiteralPath $exe)) { throw "Falta o ClaudeUsageWidget.exe a
 
 # A downloaded zip marks its files as from the internet; started from a script,
 # Windows may refuse them.
-Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.exe' | Unblock-File -ErrorAction SilentlyContinue
+Get-ChildItem -LiteralPath $PSScriptRoot -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
 
 # Start-Process joins the arguments with spaces: the folder needs its quotes.
 # One flat list of strings: Start-Process refuses a list inside a list.

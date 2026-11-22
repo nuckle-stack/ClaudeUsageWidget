@@ -105,9 +105,11 @@ USAR
 
 O QUE O INSTALADOR ALTERA
 -------------------------
-  - Copia ClaudeUsageWidget.exe e ClaudeUsageFeed.exe para
+  - Copia o widget (ClaudeUsageWidget.exe e a pasta runtime, com o .NET que ele
+    usa só para si) e o ClaudeUsageFeed.exe para
     %LOCALAPPDATA%\Programs\ClaudeUsageWidget. O ClaudeUsageFeed.exe é o que o
-    Claude Code chama para mandar dados ao widget.
+    Claude Code chama para mandar dados ao widget. Nas atualizações só copia o
+    que mudou.
   - Em %USERPROFILE%\.claude\settings.json: o "statusLine" e um hook
     "Notification", ambos para o ClaudeUsageFeed.exe. Antes guarda uma cópia
     (settings.json.bak-usage-widget-...). Se já tinhas um statusline, ele
@@ -135,6 +137,10 @@ PROBLEMAS
     Fica também em %USERPROFILE%\.claude\usage-widget\diagnostico.txt.
     Se o widget nem arranca, corre isto para o gerar:
       %LOCALAPPDATA%\Programs\ClaudeUsageWidget\ClaudeUsageWidget.exe --diagnostics
+  - Aparece uma janela a pedir para instalar o .NET: o ClaudeUsageWidget.exe
+    foi aberto de dentro do zip, sem o extrair, e não encontrou a pasta
+    runtime. Não instales nada: extrai o zip todo e abre o exe na pasta
+    extraída.
   - O Windows não deixa abrir o .exe (sem "Executar mesmo assim") ou o
     antivírus apaga-o: o PC tem regras da empresa contra programas não
     assinados. Fala com o IT.

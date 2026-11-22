@@ -16,9 +16,10 @@ public record InstallResult(bool? LimitsOk, string Detail, string? DiagnosticsPa
 
 /// <summary>
 /// Installs, updates and removes the widget, from the widget itself: the zip
-/// holds ClaudeUsageWidget.exe and ClaudeUsageFeed.exe, and running the
-/// first from there installs both. Nothing needs PowerShell. It puts the exes
-/// in %LOCALAPPDATA%\Programs\ClaudeUsageWidget (no admin rights), points
+/// holds ClaudeUsageWidget.exe (with its dll and its own .NET in runtime\) and
+/// ClaudeUsageFeed.exe, and running the first from there installs it all.
+/// Nothing needs PowerShell. It puts the files in
+/// %LOCALAPPDATA%\Programs\ClaudeUsageWidget (no admin rights), points
 /// Claude Code's statusline and Notification hook at the feed (keeping a
 /// statusline that was already there: the feed calls it), and can start the
 /// widget with Windows. settings.json is backed up before every change.
@@ -86,20 +87,23 @@ public static class Installer
     public static async Task<InstallResult> InstallAsync(InstallOptions o, Action<string> step)
     {
         var source = Environment.ProcessPath ?? throw new InvalidOperationException("Sem caminho para o executável.");
-        var sourceFeed = Path.Combine(Path.GetDirectoryName(source)!, FeedName);
-        if (!File.Exists(sourceFeed)) throw new FileNotFoundException($"Falta o {FeedName} ao lado do {ExeName}. Extrai o zip todo.");
+        var package = Path.GetDirectoryName(source)!;
+        if (!File.Exists(Path.Combine(package, FeedName))) throw new FileNotFoundException($"Falta o {FeedName} ao lado do {ExeName}. Extrai o zip todo.");
         if (AutoHello.Candidates("claude").Count == 0)
             step("Aviso: Claude Code não encontrado. Instala-o e faz /login; sem ele o widget não recebe dados.");
 
-        // 1. The exes.
+        // 1. The files.
         var exe = Path.Combine(o.Dir, ExeName);
         var feed = Path.Combine(o.Dir, FeedName);
         Directory.CreateDirectory(o.Dir);
         CleanUpOld(o.Dir);
         StopWidget(exe);
-        if (!SamePath(source, exe)) CopyReplacing(source, exe);
-        if (!SamePath(sourceFeed, feed)) CopyReplacing(sourceFeed, feed);
-        foreach (var f in new[] { exe, feed }) Unblock(f);
+        RemoveOldExtractions();
+        if (!SamePath(package, o.Dir))
+        {
+            var (copied, kept) = CopyPackage(package, o.Dir);
+            Log.Write($"Instalação: {copied} ficheiro(s) copiados, {kept} já estavam iguais.");
+        }
         File.WriteAllText(Path.Combine(o.Dir, Marker), "Instalado pelo Claude Usage Widget. Este ficheiro marca a pasta onde ele está instalado.\n");
         step($"Widget: {exe}");
 
@@ -398,10 +402,85 @@ public static class Installer
         }
     }
 
+    /// <summary>The folder next to the exe that holds the widget's own copy of .NET (see pack.ps1).</summary>
+    public const string RuntimeDir = "runtime";
+
+    /// <summary>
+    /// What an install copies from the package, relative to it: the widget
+    /// (exe, dll and their .json), the feed, and the .NET under runtime\.
+    /// Named one by one: the package may sit among the user's own files.
+    /// </summary>
+    internal static List<string> PackageFiles(string package)
+    {
+        var app = Path.GetFileNameWithoutExtension(ExeName) + ".";
+        var files = Directory.EnumerateFiles(package)
+            .Select(Path.GetFileName)
+            .Where(n => n!.StartsWith(app, StringComparison.OrdinalIgnoreCase) || n.Equals(FeedName, StringComparison.OrdinalIgnoreCase))
+            .Select(n => n!)
+            .ToList();
+        var runtime = Path.Combine(package, RuntimeDir);
+        if (Directory.Exists(runtime))
+            files.AddRange(Directory.EnumerateFiles(runtime, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(package, f)));
+        return files;
+    }
+
+    /// <summary>
+    /// Copies the package into the install folder. A file already there with
+    /// the same size and time is left alone: .NET does not change from one
+    /// version of the widget to the next, and every file written anew is one
+    /// more for the antivirus to look at before the widget starts. Whatever
+    /// runtime\ holds that the package does not (an older .NET) goes.
+    /// </summary>
+    internal static (int Copied, int Kept) CopyPackage(string package, string dir)
+    {
+        var (copied, kept) = (0, 0);
+        var files = PackageFiles(package);
+        foreach (var rel in files)
+        {
+            var (from, to) = (Path.Combine(package, rel), Path.Combine(dir, rel));
+            var (a, b) = (new FileInfo(from), new FileInfo(to));
+            if (b.Exists && a.Length == b.Length && a.LastWriteTimeUtc == b.LastWriteTimeUtc)
+            {
+                kept++;
+                continue;
+            }
+            Directory.CreateDirectory(Path.GetDirectoryName(to)!);
+            CopyReplacing(from, to);
+            Unblock(to);
+            copied++;
+        }
+
+        var runtime = Path.Combine(dir, RuntimeDir);
+        if (Directory.Exists(runtime))
+        {
+            var wanted = files.Select(f => Path.GetFullPath(Path.Combine(dir, f))).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var f in Directory.EnumerateFiles(runtime, "*", SearchOption.AllDirectories).ToList())
+                if (!wanted.Contains(Path.GetFullPath(f)))
+                    try { File.Delete(f); } catch { }
+            foreach (var d in Directory.EnumerateDirectories(runtime, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length))
+                try { if (!Directory.EnumerateFileSystemEntries(d).Any()) Directory.Delete(d); } catch { }
+        }
+        return (copied, kept);
+    }
+
     private static void CleanUpOld(string dir)
     {
-        foreach (var old in Directory.EnumerateFiles(dir, "*.old-*"))
+        foreach (var old in Directory.EnumerateFiles(dir, "*.old-*", SearchOption.AllDirectories))
             try { File.Delete(old); } catch { }
+    }
+
+    /// <summary>
+    /// Up to 1.8 the widget was a single exe, which unpacked part of .NET into
+    /// %TEMP%\.net\ClaudeUsageWidget on each new version's first start and
+    /// never removed it. Nothing uses those folders any more.
+    /// </summary>
+    private static void RemoveOldExtractions()
+    {
+        var root = new DirectoryInfo(Path.Combine(Path.GetTempPath(), ".net", Path.GetFileNameWithoutExtension(ExeName)));
+        if (!root.Exists) return;
+        foreach (var d in root.EnumerateDirectories())
+            try { d.Delete(recursive: true); } catch { }
+        try { root.Delete(); } catch { }
     }
 
     /// <summary>A file from a downloaded zip carries a "from the internet" mark; installed, it is ours.</summary>

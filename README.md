@@ -20,15 +20,25 @@ dotnet build                                            # compila para bin\
 powershell -ExecutionPolicy Bypass -File .\pack.ps1     # gera dist\ClaudeUsageWidget.zip
 ```
 
-O `pack.ps1` publica dois executáveis autónomos (não precisam de .NET instalado):
+O `pack.ps1` gera um pacote que não precisa de .NET instalado:
 
-- `ClaudeUsageWidget.exe`, o widget. Corrido a partir do zip, instala-se a si
-  próprio (ver **Instalar** abaixo).
+- `ClaudeUsageWidget.exe` e `ClaudeUsageWidget.dll`, o widget. Corrido a partir
+  do zip, instala-se a si próprio (ver **Instalar** abaixo).
+- `runtime\`, o .NET 10 em que o widget corre, copiado do .NET mais recente
+  desta máquina (sem as traduções). O exe só procura o .NET aí
+  (`AppHostDotNetSearch=AppRelative`), nunca o do sistema.
 - `ClaudeUsageFeed.exe`, o statusline e o hook de avisos que o Claude Code
   chama (projeto em `feed\`). Corre a cada atualização do statusline, por isso
-  é pequeno e pré-compilado: arranca em cerca de 70 ms.
+  é um exe único, pequeno e pré-compilado: arranca em cerca de 70 ms.
 
-Junta-lhes o `LEIA-ME.txt`, a `LICENSE` e o `install.ps1`.
+Junta-lhes o `LEIA-ME.txt`, a `LICENSE` e o `install.ps1`, e confirma que o
+widget arranca com o .NET da pasta `runtime\` antes de fazer o zip.
+
+Até à 1.8 o widget era um exe único de 66 MB, comprimido. Em cada versão nova,
+o primeiro arranque escrevia parte do .NET em `%TEMP%\.net` e, num PC de empresa,
+o antivírus retinha-o uns minutos antes de o widget aparecer. Agora, de uma
+versão para a seguinte, só mudam o exe e a dll, que são pequenos. O `runtime\`
+é igual e a instalação deixa-o como está.
 
 ## Instalar
 
@@ -43,7 +53,11 @@ O widget instala-se sozinho, a partir do próprio exe:
 
 A instalação:
 
-- copia os dois exes para `%LOCALAPPDATA%\Programs\ClaudeUsageWidget`;
+- copia o widget, o `runtime\` e o feed para
+  `%LOCALAPPDATA%\Programs\ClaudeUsageWidget`. Os ficheiros que já lá estão
+  com o mesmo tamanho e a mesma data ficam como estão, e um .NET mais antigo
+  no `runtime\` é apagado. Apaga também o que os widgets de exe único deixaram
+  em `%TEMP%\.net`;
 - aponta o `statusLine` e o hook `Notification` do `settings.json` do Claude
   Code para o `ClaudeUsageFeed.exe`, depois de uma cópia de segurança. Um
   statusline que já existisse fica em `wrapped-command.txt` e continua a ser
@@ -86,8 +100,9 @@ Cobrem:
   com o JSON no stdin;
 - o instalador: cada ponto de partida do `settings.json` (vazio, com o
   PowerShell antigo, com o statusline de outra pessoa, já instalado, noutra
-  pasta), a desinstalação, comentários e acentos no `settings.json`, e a troca
-  de um exe em uso.
+  pasta), a desinstalação, comentários e acentos no `settings.json`, a troca
+  de um exe em uso, a cópia só do que mudou e a troca do .NET por um mais
+  recente.
 
 ## Diagnóstico
 

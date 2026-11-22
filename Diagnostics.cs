@@ -52,6 +52,8 @@ public static class Diagnostics
         Line($"Versão: {Version()}{built}");
         Line($"Exe: {exe}");
         Line($"Windows {Environment.OSVersion.Version} {RuntimeInformation.OSArchitecture} · .NET {Environment.Version} · {CultureInfo.CurrentUICulture.Name}");
+        // The widget's own (runtime\ next to the exe) or, in a build folder, the machine's.
+        Line($".NET em: {RuntimeEnvironment.GetRuntimeDirectory()}");
         Line($"Dados: {Paths.Dir}" + (Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR") is { Length: > 0 } ? " (por CLAUDE_CONFIG_DIR)" : ""));
         Line($"Arranque com o Windows: {(AutoStarts() ? "sim" : "não")}");
 

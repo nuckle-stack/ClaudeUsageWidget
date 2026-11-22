@@ -207,4 +207,80 @@ public class InstallerTests
         Assert.Equal("new", File.ReadAllText(target));
         Assert.Single(Directory.GetFiles(dir, "ClaudeUsageFeed.exe.old-*"));
     }
+
+    private static readonly DateTime Built = new(2026, 11, 22, 21, 0, 0, DateTimeKind.Utc);
+
+    /// <summary>A package as pack.ps1 lays it out, unpacked next to some of the user's own files.</summary>
+    private static string Package(string dotnet = "10.0.15", string dll = "widget 1")
+    {
+        var dir = Path.Combine(Isolation.Root, "package-" + Guid.NewGuid().ToString("N"));
+        void Put(string rel, string text, DateTime? at = null)
+        {
+            var path = Path.Combine(dir, rel);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, text);
+            File.SetLastWriteTimeUtc(path, at ?? Built);
+        }
+        Put("ClaudeUsageWidget.exe", "apphost");
+        Put("ClaudeUsageWidget.dll", dll, dll == "widget 1" ? Built : Built.AddDays(1));
+        Put("ClaudeUsageWidget.deps.json", "{}");
+        Put("ClaudeUsageWidget.runtimeconfig.json", "{}");
+        Put("ClaudeUsageFeed.exe", "feed");
+        Put("LEIA-ME.txt", "leia");
+        Put("install.ps1", "# wrapper");
+        Put("fotos-ferias.zip", "not ours");
+        Put($@"runtime\host\fxr\{dotnet}\hostfxr.dll", "fxr");
+        Put($@"runtime\shared\Microsoft.NETCore.App\{dotnet}\coreclr.dll", "clr");
+        Put($@"runtime\shared\Microsoft.WindowsDesktop.App\{dotnet}\wpfgfx_cor3.dll", "wpf");
+        return dir;
+    }
+
+    [Fact]
+    public void Package_files_are_the_widget_the_feed_and_its_dotnet()
+    {
+        var files = Installer.PackageFiles(Package()).Select(f => f.Replace('\\', '/')).Order().ToList();
+        Assert.Equal(
+        [
+            "ClaudeUsageFeed.exe", "ClaudeUsageWidget.deps.json", "ClaudeUsageWidget.dll", "ClaudeUsageWidget.exe",
+            "ClaudeUsageWidget.runtimeconfig.json",
+            "runtime/host/fxr/10.0.15/hostfxr.dll",
+            "runtime/shared/Microsoft.NETCore.App/10.0.15/coreclr.dll",
+            "runtime/shared/Microsoft.WindowsDesktop.App/10.0.15/wpfgfx_cor3.dll",
+        ], files);
+    }
+
+    [Fact]
+    public void An_update_writes_only_what_changed()
+    {
+        var installed = Path.Combine(Isolation.Root, "installed-" + Guid.NewGuid().ToString("N"));
+
+        Assert.Equal((8, 0), Installer.CopyPackage(Package(), installed));
+        Assert.Equal("clr", File.ReadAllText(Path.Combine(installed, @"runtime\shared\Microsoft.NETCore.App\10.0.15\coreclr.dll")));
+        Assert.False(File.Exists(Path.Combine(installed, "fotos-ferias.zip")));
+        Assert.False(File.Exists(Path.Combine(installed, "LEIA-ME.txt")));
+
+        // The same package again: nothing to write.
+        Assert.Equal((0, 8), Installer.CopyPackage(Package(), installed));
+
+        // A new version of the widget, on the same .NET: only its dll.
+        Assert.Equal((1, 7), Installer.CopyPackage(Package(dll: "widget 2"), installed));
+        Assert.Equal("widget 2", File.ReadAllText(Path.Combine(installed, "ClaudeUsageWidget.dll")));
+    }
+
+    [Fact]
+    public void A_newer_dotnet_replaces_the_old_one()
+    {
+        var installed = Path.Combine(Isolation.Root, "installed-" + Guid.NewGuid().ToString("N"));
+        Installer.CopyPackage(Package(), installed);
+        File.WriteAllText(Path.Combine(installed, "installed.txt"), "marker");
+
+        Installer.CopyPackage(Package(dotnet: "10.0.16"), installed);
+
+        var runtime = Path.Combine(installed, "runtime");
+        Assert.Equal(3, Directory.GetFiles(runtime, "*", SearchOption.AllDirectories).Length);
+        Assert.Empty(Directory.GetDirectories(runtime, "10.0.15", SearchOption.AllDirectories));
+        Assert.True(File.Exists(Path.Combine(runtime, @"host\fxr\10.0.16\hostfxr.dll")));
+        // Outside runtime\, nothing of the install's own goes.
+        Assert.True(File.Exists(Path.Combine(installed, "installed.txt")));
+    }
 }
