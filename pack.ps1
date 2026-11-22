@@ -47,8 +47,10 @@ Get-ChildItem -LiteralPath (Join-Path $out 'runtime\shared') -Directory | ForEac
 }
 
 # Claude Code starts the feed on every statusline refresh: trimmed and
-# precompiled (ReadyToRun) it starts in about 70 ms; uncompressed, as
-# decompressing would cost that again.
+# precompiled (ReadyToRun) it starts in about 80 ms; uncompressed, as
+# decompressing would cost that again. On the .NET in runtime\ it took 90 ms,
+# so it stays one exe; it builds to the same bytes until its code changes
+# (no commit id in its version), and the installer then leaves it in place.
 dotnet publish (Join-Path $root 'feed\ClaudeUsageFeed.csproj') -c Release -r win-x64 --self-contained `
     -p:PublishSingleFile=true -p:PublishTrimmed=true -p:PublishReadyToRun=true -p:DebugType=none -nologo -v q -o $out
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish do feed falhou.' }

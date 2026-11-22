@@ -268,6 +268,26 @@ public class InstallerTests
     }
 
     [Fact]
+    public void A_rebuilt_file_with_the_same_bytes_stays_and_a_changed_one_goes_in()
+    {
+        var installed = Path.Combine(Isolation.Root, "installed-" + Guid.NewGuid().ToString("N"));
+        Installer.CopyPackage(Package(), installed);
+        var feed = Path.Combine(installed, "ClaudeUsageFeed.exe");
+        var before = File.GetLastWriteTimeUtc(feed);
+
+        // The next version's package: the feed built again, same bytes, a day newer.
+        var next = Package();
+        File.SetLastWriteTimeUtc(Path.Combine(next, "ClaudeUsageFeed.exe"), Built.AddDays(1));
+        Assert.Equal((0, 8), Installer.CopyPackage(next, installed));
+        Assert.Equal(before, File.GetLastWriteTimeUtc(feed));
+
+        // Same size, different bytes: copied.
+        File.WriteAllText(Path.Combine(next, "ClaudeUsageFeed.exe"), "FEED");
+        Assert.Equal((1, 7), Installer.CopyPackage(next, installed));
+        Assert.Equal("FEED", File.ReadAllText(feed));
+    }
+
+    [Fact]
     public void A_newer_dotnet_replaces_the_old_one()
     {
         var installed = Path.Combine(Isolation.Root, "installed-" + Guid.NewGuid().ToString("N"));

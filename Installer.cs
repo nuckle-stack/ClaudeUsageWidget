@@ -426,10 +426,11 @@ public static class Installer
 
     /// <summary>
     /// Copies the package into the install folder. A file already there with
-    /// the same size and time is left alone: .NET does not change from one
-    /// version of the widget to the next, and every file written anew is one
-    /// more for the antivirus to look at before the widget starts. Whatever
-    /// runtime\ holds that the package does not (an older .NET) goes.
+    /// the same content is left alone: .NET does not change from one version
+    /// of the widget to the next, nor does the feed until its code does (it
+    /// builds to the same bytes, only newer), and every file written anew is
+    /// one more for the antivirus to look at before it runs. Whatever runtime\
+    /// holds that the package does not (an older .NET) goes.
     /// </summary>
     internal static (int Copied, int Kept) CopyPackage(string package, string dir)
     {
@@ -439,7 +440,7 @@ public static class Installer
         {
             var (from, to) = (Path.Combine(package, rel), Path.Combine(dir, rel));
             var (a, b) = (new FileInfo(from), new FileInfo(to));
-            if (b.Exists && a.Length == b.Length && a.LastWriteTimeUtc == b.LastWriteTimeUtc)
+            if (b.Exists && a.Length == b.Length && (a.LastWriteTimeUtc == b.LastWriteTimeUtc || SameContent(from, to)))
             {
                 kept++;
                 continue;
@@ -461,6 +462,23 @@ public static class Installer
                 try { if (!Directory.EnumerateFileSystemEntries(d).Any()) Directory.Delete(d); } catch { }
         }
         return (copied, kept);
+    }
+
+    private static bool SameContent(string a, string b)
+    {
+        try
+        {
+            using var x = new FileStream(a, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var y = new FileStream(b, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            var (bx, by) = (new byte[81920], new byte[81920]);
+            while (true)
+            {
+                var n = x.ReadAtLeast(bx, bx.Length, throwOnEndOfStream: false);
+                if (y.ReadAtLeast(by, by.Length, throwOnEndOfStream: false) != n || !bx.AsSpan(0, n).SequenceEqual(by.AsSpan(0, n))) return false;
+                if (n < bx.Length) return true;
+            }
+        }
+        catch { return false; }
     }
 
     private static void CleanUpOld(string dir)

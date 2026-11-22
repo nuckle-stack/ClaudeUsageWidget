@@ -29,7 +29,9 @@ O `pack.ps1` gera um pacote que não precisa de .NET instalado:
   (`AppHostDotNetSearch=AppRelative`), nunca o do sistema.
 - `ClaudeUsageFeed.exe`, o statusline e o hook de avisos que o Claude Code
   chama (projeto em `feed\`). Corre a cada atualização do statusline, por isso
-  é um exe único, pequeno e pré-compilado: arranca em cerca de 70 ms.
+  é um exe único, pequeno e pré-compilado: arranca em cerca de 80 ms (com o
+  .NET do `runtime\` seriam 90). Não leva o commit na versão, e por isso é
+  sempre o mesmo ficheiro, byte a byte, até o código dele mudar.
 
 Junta-lhes o `LEIA-ME.txt`, a `LICENSE` e o `install.ps1`, e confirma que o
 widget arranca com o .NET da pasta `runtime\` antes de fazer o zip.
@@ -55,8 +57,8 @@ A instalação:
 
 - copia o widget, o `runtime\` e o feed para
   `%LOCALAPPDATA%\Programs\ClaudeUsageWidget`. Os ficheiros que já lá estão
-  com o mesmo tamanho e a mesma data ficam como estão, e um .NET mais antigo
-  no `runtime\` é apagado. Apaga também o que os widgets de exe único deixaram
+  com o mesmo conteúdo ficam como estão, mesmo que o pacote os traga com data
+  mais recente, e um .NET mais antigo no `runtime\` é apagado. Apaga também o que os widgets de exe único deixaram
   em `%TEMP%\.net`;
 - aponta o `statusLine` e o hook `Notification` do `settings.json` do Claude
   Code para o `ClaudeUsageFeed.exe`, depois de uma cópia de segurança. Um

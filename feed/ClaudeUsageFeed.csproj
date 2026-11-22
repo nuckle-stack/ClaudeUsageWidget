@@ -14,6 +14,10 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <!-- No commit id in the version: the build is then the same bytes until
+         the feed's own code changes, so an update brings no new 16 MB exe for
+         the antivirus to look at, and the installer leaves it in place. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
