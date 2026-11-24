@@ -107,6 +107,9 @@ Cobrem:
   anterior), no máximo 4 no ecrã, o tempo só conta contigo ao PC, as partes
   de cada cartão, os estados do Windows que os calam, e o que cada aviso de
   uso diz no cartão;
+- a janela das definições: lê de volta o que recebeu, um valor errado leva ao
+  separador dele, os separadores têm todos a mesma altura, e a linha da versão
+  diz o que o GitHub tinha;
 - o aviso de que sobra muito da semana e a lista das semanas, com resets em
   dias e horas diferentes: cada conta tem o seu, e pode mudar de uma semana
   para a outra;

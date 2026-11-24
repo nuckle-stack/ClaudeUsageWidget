@@ -952,7 +952,7 @@ public partial class MainWindow : Window
 
     private void OpenSettings()
     {
-        var dlg = new SettingsWindow(_cfg);
+        var dlg = new SettingsWindow(_cfg, _updater.Available?.Version, _updater.LastCheck);
         if (dlg.ShowDialog() != true)
         {
             if (dlg.UninstallRequested) UninstallAndExit();

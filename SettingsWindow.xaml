@@ -1,145 +1,593 @@
 <Window x:Class="ClaudeUsageWidget.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Claude Usage — Definições" SizeToContent="WidthAndHeight" ResizeMode="NoResize"
-        WindowStartupLocation="CenterScreen" Topmost="True" FontFamily="Segoe UI" FontSize="12">
-    <StackPanel Margin="18" Width="320">
-        <TextBlock Text="Auto-hello" FontWeight="SemiBold" FontSize="13"/>
-        <CheckBox x:Name="HelloEnabled" Margin="0,8,0,0"
-                  Content="Enviar mensagem quando a janela de 5h renovar"/>
-        <StackPanel x:Name="HelloOptions" Margin="0,10,0,0">
-            <RadioButton x:Name="ModeReset" GroupName="HelloMode" Content="Logo que a janela renove"/>
-            <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
-                <TextBlock Text="Só entre as" VerticalAlignment="Center"/>
-                <TextBox x:Name="From" Width="50" Margin="8,0" TextAlignment="Center"/>
-                <TextBlock Text="e as" VerticalAlignment="Center"/>
-                <TextBox x:Name="To" Width="50" Margin="8,0" TextAlignment="Center"/>
-            </StackPanel>
-            <RadioButton x:Name="ModeSchedule" GroupName="HelloMode" Margin="0,10,0,0" Content="A horas marcadas"/>
-            <TextBox x:Name="Schedule" Margin="20,6,0,0"/>
-            <TextBlock Margin="20,4,0,0" Foreground="#666" TextWrapping="Wrap"
-                       Text="Horas de início das janelas, por exemplo 07:00, 12:00, 17:00. As janelas começam à hora certa, por isso usa horas certas."/>
-            <CheckBox x:Name="WeekdaysOnly" Margin="0,10,0,0" Content="Só em dias úteis"/>
-            <Grid Margin="0,10,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="80"/>
-                    <ColumnDefinition/>
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition/>
-                    <RowDefinition/>
-                </Grid.RowDefinitions>
-                <TextBlock Text="Mensagem" VerticalAlignment="Center"/>
-                <TextBox x:Name="Message" Grid.Column="1" Margin="0,0,0,6"/>
-                <TextBlock Grid.Row="1" Text="Modelo" VerticalAlignment="Center"/>
-                <TextBox x:Name="Model" Grid.Row="1" Grid.Column="1"/>
+        Title="Claude Usage — Definições"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" SizeToContent="Height" Width="380"
+        WindowStartupLocation="CenterScreen" Topmost="True"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        FontFamily="Segoe UI" FontSize="11" Foreground="#E6FFFFFF">
+    <!-- The widget's own look: its dark rounded panel, its greys, its blue. -->
+    <Window.Resources>
+        <Style x:Key="Focus">
+            <Setter Property="Control.Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Rectangle Margin="-3,-2" RadiusX="4" RadiusY="4" Stroke="#9960A5FA" StrokeThickness="1"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="Section" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#99FFFFFF"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,16,0,0"/>
+        </Style>
+        <Style x:Key="First" TargetType="TextBlock" BasedOn="{StaticResource Section}">
+            <Setter Property="Margin" Value="0"/>
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#80FFFFFF"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,1,0,0"/>
+        </Style>
+        <Style x:Key="Unit" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#99FFFFFF"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="6,0,0,0"/>
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="#F2FFFFFF"/>
+            <Setter Property="CaretBrush" Value="#F2FFFFFF"/>
+            <Setter Property="SelectionBrush" Value="#60A5FA"/>
+            <Setter Property="Background" Value="#12FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#30FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Box" CornerRadius="4" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" Focusable="False"
+                                          HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="#59FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="#60A5FA"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- A number next to its label: the boxes line up on the right. -->
+        <Style x:Key="Number" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+        </Style>
+
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#E6FFFFFF"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource Focus}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Background="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="Box" Width="14" Height="14" CornerRadius="3" BorderThickness="1"
+                                    BorderBrush="#59FFFFFF" Background="#0FFFFFFF" VerticalAlignment="Top" Margin="0,1,0,0">
+                                <TextBlock x:Name="Mark" Text="&#xE73E;" FontFamily="Segoe MDL2 Assets" FontSize="9"
+                                           Foreground="#15151A" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           Visibility="Collapsed"/>
+                            </Border>
+                            <ContentPresenter Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True">
+                                <ContentPresenter.Resources>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                    </Style>
+                                </ContentPresenter.Resources>
+                            </ContentPresenter>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="#99FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="#60A5FA"/>
+                                <Setter TargetName="Box" Property="BorderBrush" Value="#60A5FA"/>
+                                <Setter TargetName="Mark" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="RadioButton">
+            <Setter Property="Foreground" Value="#E6FFFFFF"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource Focus}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Grid Background="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition/>
+                            </Grid.ColumnDefinitions>
+                            <Grid Width="14" Height="14" VerticalAlignment="Top" Margin="0,1,0,0">
+                                <Ellipse x:Name="Ring" Stroke="#59FFFFFF" StrokeThickness="1" Fill="#0FFFFFFF"/>
+                                <Ellipse x:Name="Dot" Width="6" Height="6" Fill="#60A5FA" Visibility="Collapsed"/>
+                            </Grid>
+                            <ContentPresenter Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Ring" Property="Stroke" Value="#99FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Ring" Property="Stroke" Value="#60A5FA"/>
+                                <Setter TargetName="Dot" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The slider is the widget's bar, with a knob. -->
+        <Style x:Key="SliderFill" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Grid Background="Transparent">
+                            <Border Height="6" CornerRadius="3" Background="#60A5FA" VerticalAlignment="Center"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SliderRest" TargetType="RepeatButton" BasedOn="{StaticResource SliderFill}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Grid Background="Transparent"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SliderKnob" TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Ellipse x:Name="Knob" Width="12" Height="12" Fill="#E6FFFFFF"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Knob" Property="Fill" Value="#FFFFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="Slider">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource Focus}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid Height="16" Background="Transparent">
+                            <Border Height="6" CornerRadius="3" Background="#26FFFFFF" VerticalAlignment="Center"/>
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge" Style="{StaticResource SliderFill}"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge" Style="{StaticResource SliderRest}"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource SliderKnob}"/>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="Button">
+            <Setter Property="Foreground" Value="#E6FFFFFF"/>
+            <Setter Property="Background" Value="#1AFFFFFF"/>
+            <Setter Property="Padding" Value="14,4"/>
+            <Setter Property="MinWidth" Value="80"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource Focus}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border CornerRadius="4" Background="{TemplateBinding Background}"/>
+                            <Border x:Name="Hover" CornerRadius="4" Background="#1AFFFFFF" Opacity="0"/>
+                            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" RecognizesAccessKey="True"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Hover" Property="Opacity" Value="1"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Hover" Property="Background" Value="#30FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="#60A5FA"/>
+            <Setter Property="Foreground" Value="#0F1115"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style x:Key="Danger" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Foreground" Value="#F87171"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+
+        <Style TargetType="ToolTip">
+            <Setter Property="Foreground" Value="#E6FFFFFF"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="HasDropShadow" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border CornerRadius="6" Background="#FA202026" BorderBrush="#40FFFFFF" BorderThickness="1"
+                                Padding="9,6" MaxWidth="300">
+                            <ContentPresenter>
+                                <ContentPresenter.Resources>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                        <Setter Property="LineHeight" Value="15"/>
+                                    </Style>
+                                </ContentPresenter.Resources>
+                            </ContentPresenter>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A tab: grey, or white and underlined in blue when shown. -->
+        <Style x:Key="Tab" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0,0,0,2"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Padding" Value="0,0,0,5"/>
+            <Setter Property="Margin" Value="0,0,18,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+    </Window.Resources>
+
+    <Border CornerRadius="8" Background="#F815151A" BorderBrush="#30FFFFFF" BorderThickness="1" Padding="16,12,16,14">
+        <StackPanel>
+            <!-- Drags the window; the version on the right. -->
+            <Grid Background="Transparent" MouseLeftButtonDown="OnDrag">
+                <TextBlock Text="Definições" Foreground="#F2FFFFFF" FontSize="13" FontWeight="SemiBold"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock x:Name="VersionText" FontSize="10" VerticalAlignment="Center">
+                        <Run x:Name="VersionNow" Foreground="#80FFFFFF"/><Run x:Name="VersionNew" Foreground="#60A5FA"/>
+                    </TextBlock>
+                    <TextBlock x:Name="CloseGlyph" Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="9" Padding="10,3,2,3"
+                               VerticalAlignment="Center" Background="Transparent" ToolTip="Fechar sem guardar"
+                               MouseLeftButtonUp="OnClose">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#80FFFFFF"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Foreground" Value="#F2FFFFFF"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
             </Grid>
-        </StackPanel>
 
-        <Separator Margin="0,16,0,12"/>
-        <TextBlock Text="Avisos" FontWeight="SemiBold" FontSize="13"/>
-        <CheckBox x:Name="AlertsEnabled" Margin="0,8,0,0"
-                  Content="Avisar quando uma sessão termina ou precisa de mim"/>
-        <CheckBox x:Name="AlertsSound" Margin="0,8,0,0" Content="Com som"/>
-        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-            <TextBlock Text="Só tarefas com mais de" VerticalAlignment="Center"/>
-            <TextBox x:Name="MinTask" Width="40" Margin="8,0" TextAlignment="Center"/>
-            <TextBlock Text="s" VerticalAlignment="Center"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-            <TextBlock Text="Relembrar pedidos a cada" VerticalAlignment="Center"/>
-            <TextBox x:Name="Remind" Width="40" Margin="8,0" TextAlignment="Center"
-                     ToolTip="Só para sessões à espera de ti (permissões, perguntas), no máximo 3 vezes. Tarefas concluídas avisam uma só vez."/>
-            <TextBlock Text="min (0 = só uma vez)" VerticalAlignment="Center"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-            <TextBlock Text="Avisar se uma tarefa não avançar em" VerticalAlignment="Center"/>
-            <TextBox x:Name="StallMinutes" Width="36" Margin="8,0" TextAlignment="Center"
-                     ToolTip="Uma vez, quando uma sessão está a trabalhar mas a conversa não tem nada de novo há este tempo: uma ferramenta que não responde, por exemplo. O Claude Code já interrompe os comandos ao fim de 2 a 10 minutos, por isso convém mais de 10. 0 = nunca."/>
-            <TextBlock Text="min" VerticalAlignment="Center"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-            <TextBlock Text="Atalho para a sessão à tua espera" VerticalAlignment="Center"/>
-            <TextBox x:Name="HotkeyBox" Width="90" Margin="8,0" TextAlignment="Center"
-                     ToolTip="Em qualquer programa, salta para a sessão que espera há mais tempo; outra vez, para a seguinte. Ex. Ctrl+Alt+C. Vazio = sem atalho."/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-            <TextBlock Text="Avisar de uso aos" VerticalAlignment="Center"/>
-            <TextBox x:Name="Levels" Width="70" Margin="8,0" TextAlignment="Center"/>
-            <TextBlock Text="% (vazio = nunca)" VerticalAlignment="Center"/>
-        </StackPanel>
-        <CheckBox x:Name="ForecastAlert" Margin="0,8,0,0"
-                  Content="Avisar se o ritmo esgotar o limite antes do reset"/>
-        <CheckBox x:Name="BudgetAlert" Margin="0,8,0,0"
-                  Content="Avisar quando hoje passar a parte diária do limite semanal"/>
-        <CheckBox x:Name="BudgetWeekdays" Margin="20,6,0,0"
-                  Content="Repartir só pelos dias úteis (hoje conta sempre)"/>
-        <StackPanel Orientation="Horizontal" Margin="20,6,0,0">
-            <TextBlock Text="O dia começa às" VerticalAlignment="Center"/>
-            <TextBox x:Name="DayStartHour" Width="30" Margin="8,0" TextAlignment="Center"/>
-            <TextBlock Text="h (uma noite tardia conta com a véspera)" VerticalAlignment="Center"/>
-        </StackPanel>
-        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-            <TextBlock Text="Avisar antes do reset semanal se ainda sobrar" VerticalAlignment="Center"/>
-            <TextBox x:Name="LeftoverAbove" Width="36" Margin="8,0" TextAlignment="Center"
-                     ToolTip="Uma vez por semana, quando faltam dois dias para o reset (hoje e o seguinte, contados como na parte diária: só os úteis, se escolheste isso), se ainda sobrar pelo menos esta parte do limite semanal. O que sobra não passa para a semana seguinte. 0 = nunca."/>
-            <TextBlock Text="% ou mais" VerticalAlignment="Center"/>
-        </StackPanel>
-        <CheckBox x:Name="ContextEnabled" Margin="0,12,0,0"
-                  Content="Avisar quando o contexto de uma sessão degrada"/>
-        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-            <TextBlock Text="Qualidade abaixo de" VerticalAlignment="Center"/>
-            <TextBox x:Name="QualityBelow" Width="36" Margin="8,0" TextAlignment="Center"/>
-            <TextBlock Text="ou contexto acima de" VerticalAlignment="Center"/>
-            <TextBox x:Name="FillAbove" Width="36" Margin="8,0" TextAlignment="Center"/>
-            <TextBlock Text="%" VerticalAlignment="Center"/>
-        </StackPanel>
+            <Border BorderBrush="#18FFFFFF" BorderThickness="0,0,0,1" Margin="0,10,0,0">
+                <StackPanel x:Name="Tabs" Orientation="Horizontal">
+                    <Border Style="{StaticResource Tab}" MouseLeftButtonUp="OnTab"><TextBlock Text="Avisos"/></Border>
+                    <Border Style="{StaticResource Tab}" MouseLeftButtonUp="OnTab"><TextBlock Text="Limites"/></Border>
+                    <Border Style="{StaticResource Tab}" MouseLeftButtonUp="OnTab"><TextBlock Text="Auto-hello"/></Border>
+                    <Border Style="{StaticResource Tab}" MouseLeftButtonUp="OnTab"><TextBlock Text="Widget"/></Border>
+                </StackPanel>
+            </Border>
 
-        <Separator Margin="0,16,0,12"/>
-        <TextBlock Text="Atualização" FontWeight="SemiBold" FontSize="13"/>
-        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-            <TextBlock Text="Atualizar a cada" VerticalAlignment="Center"/>
-            <TextBox x:Name="RefreshMinutes" Width="40" Margin="8,0" TextAlignment="Center"/>
-            <TextBlock Text="min (0 = nunca)" VerticalAlignment="Center"/>
-        </StackPanel>
-        <TextBlock Margin="0,6,0,0" Foreground="#666" TextWrapping="Wrap"
-                   Text="Só enquanto o Claude estiver a ser usado. Cada atualização envia uma mensagem curta no modelo acima."/>
+            <!-- The pages share one cell, and the ones not shown stay Hidden (not Collapsed): the
+                 window keeps the height of the tallest and does not jump between tabs. -->
+            <Grid x:Name="Pages" Margin="0,14,0,0">
 
-        <Separator Margin="0,16,0,12"/>
-        <TextBlock Text="Janela" FontWeight="SemiBold" FontSize="13"/>
-        <CheckBox x:Name="OnTop" Margin="0,8,0,0" Content="Sempre por cima"/>
-        <CheckBox x:Name="TrayPercent" Margin="0,8,0,0" Content="Mostrar a % da janela de 5h no ícone junto ao relógio"/>
-        <CheckBox x:Name="AutoStart" Margin="0,8,0,0" Content="Iniciar com o Windows"/>
-        <CheckBox x:Name="CheckUpdates" Margin="0,8,0,0" Content="Procurar versões novas no GitHub e oferecer a instalação"/>
-        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-            <TextBlock Text="Esconder sessões do Desktop paradas há" VerticalAlignment="Center"/>
-            <TextBox x:Name="HideIdle" Width="40" Margin="8,0" TextAlignment="Center"/>
-            <TextBlock Text="min (0 = nunca)" VerticalAlignment="Center"/>
-        </StackPanel>
-        <Grid Margin="0,10,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="80"/>
-                <ColumnDefinition/>
-            </Grid.ColumnDefinitions>
-            <TextBlock Text="Opacidade" VerticalAlignment="Center"/>
-            <Slider x:Name="OpacitySlider" Grid.Column="1" Minimum="0.3" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="True"/>
-        </Grid>
-        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-            <TextBlock Text="Amarelo aos" VerticalAlignment="Center"/>
-            <TextBox x:Name="WarnAt" Width="40" Margin="8,0" TextAlignment="Center"/>
-            <TextBlock Text="%, vermelho aos" VerticalAlignment="Center"/>
-            <TextBox x:Name="CritAt" Width="40" Margin="8,0" TextAlignment="Center"/>
-            <TextBlock Text="%" VerticalAlignment="Center"/>
-        </StackPanel>
+                <!-- ============ Avisos ============ -->
+                <StackPanel>
+                    <TextBlock Text="Sessões" Style="{StaticResource First}"/>
+                    <CheckBox x:Name="AlertsEnabled" Margin="0,8,0,0"
+                              Content="Avisar quando uma sessão termina ou precisa de ti"/>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Só tarefas com mais de" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        <TextBox x:Name="MinTask" Grid.Column="1" Style="{StaticResource Number}"
+                                 ToolTip="Uma tarefa mais curta termina sem aviso. Os pedidos (permissões, perguntas) avisam sempre."/>
+                        <TextBlock Grid.Column="2" Text="s" Style="{StaticResource Unit}"/>
+                    </Grid>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                            <TextBlock Text="Relembrar pedidos a cada" TextWrapping="Wrap"/>
+                            <TextBlock Text="0 = só uma vez" Style="{StaticResource Hint}"/>
+                        </StackPanel>
+                        <TextBox x:Name="Remind" Grid.Column="1" Style="{StaticResource Number}"
+                                 ToolTip="Só para sessões à espera de ti (permissões, perguntas), no máximo 3 vezes. Tarefas concluídas avisam uma só vez."/>
+                        <TextBlock Grid.Column="2" Text="min" Style="{StaticResource Unit}"/>
+                    </Grid>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                            <TextBlock Text="Avisar se uma tarefa não avançar em" TextWrapping="Wrap"/>
+                            <TextBlock Text="0 = nunca" Style="{StaticResource Hint}"/>
+                        </StackPanel>
+                        <TextBox x:Name="StallMinutes" Grid.Column="1" Style="{StaticResource Number}"
+                                 ToolTip="Uma vez, quando uma sessão está a trabalhar mas a conversa não tem nada de novo há este tempo: uma ferramenta que não responde, por exemplo. O Claude Code já interrompe os comandos ao fim de 2 a 10 minutos, por isso convém mais de 10. 0 = nunca."/>
+                        <TextBlock Grid.Column="2" Text="min" Style="{StaticResource Unit}"/>
+                    </Grid>
 
-        <TextBlock x:Name="Error" Foreground="#C0392B" Margin="0,12,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
-        <Grid Margin="0,16,0,0">
-            <Button Content="Desinstalar…" Padding="8,4" HorizontalAlignment="Left" Click="OnUninstall"
-                    ToolTip="Repõe o statusline e os avisos do Claude Code e apaga o widget, as definições e o histórico"/>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Guardar" Width="80" Padding="0,4" IsDefault="True" Click="OnSave"/>
-                <Button Content="Cancelar" Width="80" Padding="0,4" Margin="8,0,0,0" IsCancel="True"/>
+                    <TextBlock Text="Contexto" Style="{StaticResource Section}"/>
+                    <CheckBox x:Name="ContextEnabled" Margin="0,8,0,0"
+                              Content="Avisar quando o contexto de uma sessão degrada"/>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Qualidade abaixo de" VerticalAlignment="Center"/>
+                        <TextBox x:Name="QualityBelow" Grid.Column="1" Style="{StaticResource Number}"
+                                 ToolTip="A nota de 0 a 100 que a lista das sessões mostra para o contexto de cada uma. 0 = nunca."/>
+                    </Grid>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                            <TextBlock Text="Ou contexto ocupado acima de" TextWrapping="Wrap"/>
+                            <TextBlock Text="0 desliga cada um destes" Style="{StaticResource Hint}"/>
+                        </StackPanel>
+                        <TextBox x:Name="FillAbove" Grid.Column="1" Style="{StaticResource Number}"/>
+                        <TextBlock Grid.Column="2" Text="%" Style="{StaticResource Unit}"/>
+                    </Grid>
+
+                    <TextBlock Text="Geral" Style="{StaticResource Section}"/>
+                    <CheckBox x:Name="AlertsSound" Margin="0,8,0,0" Content="Tocar um som com os avisos"/>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                            <TextBlock Text="Atalho para a sessão à tua espera" TextWrapping="Wrap"/>
+                            <TextBlock Text="Ex. Ctrl+Alt+C; vazio = sem atalho" Style="{StaticResource Hint}"/>
+                        </StackPanel>
+                        <TextBox x:Name="HotkeyBox" Grid.Column="1" Width="110" TextAlignment="Center"
+                                 ToolTip="Em qualquer programa, salta para a sessão que espera há mais tempo; outra vez, para a seguinte."/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- ============ Limites ============ -->
+                <StackPanel Visibility="Hidden">
+                    <TextBlock Text="Avisos de uso" Style="{StaticResource First}"/>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                            <TextBlock Text="Avisar quando um limite chegar aos" TextWrapping="Wrap"/>
+                            <TextBlock Text="Separados por vírgulas; vazio = nunca" Style="{StaticResource Hint}"/>
+                        </StackPanel>
+                        <TextBox x:Name="Levels" Grid.Column="1" Width="70" TextAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="%" Style="{StaticResource Unit}"/>
+                    </Grid>
+                    <CheckBox x:Name="ForecastAlert" Margin="0,10,0,0"
+                              Content="Avisar se o ritmo esgotar o limite antes do reset"/>
+                    <CheckBox x:Name="BudgetAlert" Margin="0,8,0,0"
+                              Content="Avisar quando hoje passar a parte diária do limite semanal"/>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                            <TextBlock Text="Avisar antes do reset se ainda sobrar" TextWrapping="Wrap"/>
+                            <TextBlock Text="Do limite semanal; 0 = nunca" Style="{StaticResource Hint}"/>
+                        </StackPanel>
+                        <TextBox x:Name="LeftoverAbove" Grid.Column="1" Style="{StaticResource Number}"
+                                 ToolTip="Uma vez por semana, quando faltam dois dias para o reset (hoje e o seguinte, contados como na parte diária: só os úteis, se escolheste isso), se ainda sobrar pelo menos esta parte do limite semanal. O que sobra não passa para a semana seguinte. 0 = nunca."/>
+                        <TextBlock Grid.Column="2" Text="%" Style="{StaticResource Unit}"/>
+                    </Grid>
+
+                    <TextBlock Text="Repartir a semana" Style="{StaticResource Section}"
+                               ToolTip="Para a parte diária e para o aviso do que sobra antes do reset."/>
+                    <CheckBox x:Name="BudgetWeekdays" Margin="0,8,0,0"
+                              Content="Só pelos dias úteis (hoje conta sempre)"/>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                            <TextBlock Text="O dia começa às" TextWrapping="Wrap"/>
+                            <TextBlock Text="Uma noite tardia conta com a véspera" Style="{StaticResource Hint}"/>
+                        </StackPanel>
+                        <TextBox x:Name="DayStartHour" Grid.Column="1" Style="{StaticResource Number}"/>
+                        <TextBlock Grid.Column="2" Text="h" Style="{StaticResource Unit}"/>
+                    </Grid>
+
+                    <TextBlock Text="Cores das barras" Style="{StaticResource Section}"/>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+                        <Ellipse Width="8" Height="8" Fill="#FACC15" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Grid.Column="1" Text="Amarelo a partir de" VerticalAlignment="Center"/>
+                        <TextBox x:Name="WarnAt" Grid.Column="2" Style="{StaticResource Number}"/>
+                        <TextBlock Grid.Column="3" Text="%" Style="{StaticResource Unit}"/>
+                    </Grid>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+                        <Ellipse Width="8" Height="8" Fill="#F87171" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Grid.Column="1" Text="Vermelho a partir de" VerticalAlignment="Center"/>
+                        <TextBox x:Name="CritAt" Grid.Column="2" Style="{StaticResource Number}"/>
+                        <TextBlock Grid.Column="3" Text="%" Style="{StaticResource Unit}"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- ============ Auto-hello ============ -->
+                <StackPanel Visibility="Hidden">
+                    <TextBlock Text="Auto-hello" Style="{StaticResource First}"/>
+                    <CheckBox x:Name="HelloEnabled" Margin="0,8,0,0"
+                              Content="Enviar uma mensagem quando a janela de 5h renovar"/>
+                    <StackPanel x:Name="HelloOptions" Margin="22,10,0,0">
+                        <RadioButton x:Name="ModeReset" GroupName="HelloMode" Content="Logo que a janela renove"/>
+                        <StackPanel Orientation="Horizontal" Margin="22,6,0,0">
+                            <TextBlock Text="Só entre as" VerticalAlignment="Center"/>
+                            <TextBox x:Name="From" Width="50" Margin="8,0" TextAlignment="Center"/>
+                            <TextBlock Text="e as" VerticalAlignment="Center"/>
+                            <TextBox x:Name="To" Width="50" Margin="8,0" TextAlignment="Center"/>
+                        </StackPanel>
+                        <RadioButton x:Name="ModeSchedule" GroupName="HelloMode" Margin="0,10,0,0" Content="A horas marcadas"/>
+                        <TextBox x:Name="Schedule" Margin="22,6,0,0"/>
+                        <TextBlock Margin="22,4,0,0" Style="{StaticResource Hint}"
+                                   Text="Horas de início das janelas, por exemplo 07:00, 12:00, 17:00. As janelas começam à hora certa, por isso usa horas certas."/>
+                        <CheckBox x:Name="WeekdaysOnly" Margin="0,10,0,0" Content="Só em dias úteis"/>
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Mensagem" VerticalAlignment="Center"/>
+                            <TextBox x:Name="Message" Grid.Column="1" Margin="0,0,0,6"/>
+                            <TextBlock Grid.Row="1" Text="Modelo" VerticalAlignment="Center"/>
+                            <TextBox x:Name="Model" Grid.Row="1" Grid.Column="1"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <TextBlock Text="Atualização dos limites" Style="{StaticResource Section}"/>
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                            <TextBlock Text="Atualizar a cada" TextWrapping="Wrap"/>
+                            <TextBlock Text="0 = nunca" Style="{StaticResource Hint}"/>
+                        </StackPanel>
+                        <TextBox x:Name="RefreshMinutes" Grid.Column="1" Style="{StaticResource Number}"/>
+                        <TextBlock Grid.Column="2" Text="min" Style="{StaticResource Unit}"/>
+                    </Grid>
+                    <TextBlock Margin="0,6,0,0" Style="{StaticResource Hint}"
+                               Text="Só enquanto o Claude estiver a ser usado. Cada atualização envia uma mensagem curta no modelo acima."/>
+                </StackPanel>
+
+                <!-- ============ Widget ============ -->
+                <StackPanel Visibility="Hidden">
+                    <TextBlock Text="Janela" Style="{StaticResource First}"/>
+                    <CheckBox x:Name="OnTop" Margin="0,8,0,0" Content="Sempre por cima"/>
+                    <CheckBox x:Name="TrayPercent" Margin="0,8,0,0" Content="Mostrar a % da janela de 5h no ícone junto ao relógio"/>
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="36"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Opacidade" VerticalAlignment="Center"/>
+                        <Slider x:Name="OpacitySlider" Grid.Column="1" Minimum="0.3" Maximum="1" TickFrequency="0.05"
+                                IsSnapToTickEnabled="True" SmallChange="0.05" LargeChange="0.1" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="OpacityValue" Grid.Column="2" Foreground="#F2FFFFFF" FontWeight="SemiBold"
+                                   TextAlignment="Right" VerticalAlignment="Center"/>
+                    </Grid>
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="30"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,10,0">
+                            <TextBlock Text="Esconder sessões do Desktop paradas há" TextWrapping="Wrap"/>
+                            <TextBlock Text="0 = nunca" Style="{StaticResource Hint}"/>
+                        </StackPanel>
+                        <TextBox x:Name="HideIdle" Grid.Column="1" Style="{StaticResource Number}"/>
+                        <TextBlock Grid.Column="2" Text="min" Style="{StaticResource Unit}"/>
+                    </Grid>
+
+                    <TextBlock Text="Arranque e versões" Style="{StaticResource Section}"/>
+                    <CheckBox x:Name="AutoStart" Margin="0,8,0,0" Content="Iniciar com o Windows"/>
+                    <CheckBox x:Name="CheckUpdates" Margin="0,8,0,0" Content="Procurar versões novas no GitHub e oferecer a instalação"/>
+                    <TextBlock x:Name="VersionLine" Margin="22,4,0,0" Style="{StaticResource Hint}"/>
+
+                    <TextBlock Text="Remover" Style="{StaticResource Section}"/>
+                    <TextBlock Margin="0,4,0,8" Style="{StaticResource Hint}"
+                               Text="Repõe o statusline e os avisos do Claude Code como estavam e apaga o widget, as definições e o histórico."/>
+                    <Button Content="Desinstalar…" Style="{StaticResource Danger}" Click="OnUninstall"/>
+                </StackPanel>
+            </Grid>
+
+            <TextBlock x:Name="Error" Foreground="#F87171" Margin="0,14,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <Button Content="Cancelar" IsCancel="True"/>
+                <Button Content="Guardar" Style="{StaticResource Primary}" Margin="8,0,0,0" IsDefault="True" Click="OnSave"/>
             </StackPanel>
-        </Grid>
-    </StackPanel>
+        </StackPanel>
+    </Border>
 </Window>

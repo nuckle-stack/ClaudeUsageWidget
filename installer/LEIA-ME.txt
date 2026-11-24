@@ -47,7 +47,9 @@ USAR
     mostra as notificações (para não ficar tapado). Arrasta-o para onde quiseres.
   - Clique: abre a lista de sessões. Clicar numa sessão traz a janela dela para
     a frente. O "x" (ao passar o rato) esconde-a até voltar a ter atividade.
-  - Botão direito: Definições (auto-hello, avisos, cores), Não incomodar, Sair.
+  - Botão direito: Definições, Não incomodar, Sair. As Definições têm um
+    separador para os avisos, os limites, o auto-hello e o próprio widget, e
+    mostram a versão instalada.
   - Também há um ícone junto ao relógio, com a % da janela de 5h na mesma cor
     do widget. Assim podes esconder o widget e continuar a ver o número (nas
     Definições trocas o número por um simples ponto colorido). No início, o
@@ -149,7 +151,7 @@ O QUE O INSTALADOR ALTERA
 
 DESINSTALAR
 -----------
-  Botão direito no widget > Definições > "Desinstalar…".
+  Botão direito no widget > Definições > separador "Widget" > "Desinstalar…".
 
   Repõe o statusline que tinhas antes, tira o aviso do Claude Code e apaga o
   widget, as definições e o histórico dele.

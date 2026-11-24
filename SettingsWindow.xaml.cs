@@ -1,21 +1,42 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
 using Microsoft.Win32;
 
 namespace ClaudeUsageWidget;
 
+/// <summary>
+/// The settings, drawn like the widget: a dark panel with a tab for each
+/// part (notices, limits, auto-hello, the widget itself) and the version
+/// installed in its heading.
+/// </summary>
 public partial class SettingsWindow : Window
 {
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string RunName = "ClaudeUsageWidget";
 
+    private static readonly Brush Shown = Frozen("#F2FFFFFF");
+    private static readonly Brush NotShown = Frozen("#80FFFFFF");
+    private static readonly Brush Underline = Frozen("#60A5FA");
+
     private readonly Config _original;
     public Config Result { get; private set; }
 
-    public SettingsWindow(Config cfg)
+    /// <param name="newer">A newer version found on GitHub, if any.</param>
+    /// <param name="lastCheck">When the widget last looked for one (UTC), default if not yet.</param>
+    public SettingsWindow(Config cfg, Version? newer = null, DateTime lastCheck = default)
     {
         InitializeComponent();
         _original = cfg;
         Result = cfg;
+
+        var now = Updater.Current.ToString(3);
+        VersionNow.Text = $"versão {now}";
+        VersionNew.Text = newer is null ? "" : $" · há a {newer.ToString(3)}";
+        VersionText.ToolTip = $"Versão instalada: {Diagnostics.Version()}";
+        VersionLine.Text = VersionStatus(now, newer, lastCheck, cfg.CheckUpdates);
+        if (VersionLine.Text.Length == 0) VersionLine.Visibility = Visibility.Collapsed;
 
         HelloEnabled.IsChecked = cfg.AutoHello.Enabled;
         From.Text = cfg.AutoHello.From;
@@ -54,17 +75,110 @@ public partial class SettingsWindow : Window
         HelloEnabled.Checked += (_, _) => SyncEnabled();
         HelloEnabled.Unchecked += (_, _) => SyncEnabled();
         SyncEnabled();
+        OpacitySlider.ValueChanged += (_, _) => ShowOpacity();
+        ShowOpacity();
+
+        PreviewKeyDown += OnKey;
+        ShowTab(0);
     }
 
-    private void SyncEnabled() => HelloOptions.IsEnabled = HelloEnabled.IsChecked == true;
+    /// <summary>
+    /// The line under "look for new versions": what GitHub had the last time
+    /// the widget looked. Empty when it does not look and knows of nothing newer.
+    /// </summary>
+    internal static string VersionStatus(string now, Version? newer, DateTime lastCheck, bool checking)
+    {
+        if (newer is not null)
+            return $"A {newer.ToString(3)} já saiu: instala-a com o botão direito no widget.";
+        if (!checking) return "";
+        return lastCheck == default
+            ? "Procura um minuto depois de o widget arrancar, e depois de 6 em 6 horas."
+            : $"A {now} é a mais recente (procurou às {lastCheck.ToLocalTime():HH:mm}).";
+    }
+
+    // ---- look ------------------------------------------------------------------------------
+
+    private void SyncEnabled()
+    {
+        var on = HelloEnabled.IsChecked == true;
+        HelloOptions.IsEnabled = on;
+        // The texts don't grey out by themselves.
+        HelloOptions.Opacity = on ? 1 : 0.4;
+    }
+
+    private void ShowOpacity() => OpacityValue.Text = $"{OpacitySlider.Value * 100:0}%";
+
+    internal void ShowTab(int index)
+    {
+        for (var i = 0; i < Pages.Children.Count; i++)
+        {
+            var shown = i == index;
+            // Hidden, not Collapsed: the tallest page keeps the window's height.
+            Pages.Children[i].Visibility = shown ? Visibility.Visible : Visibility.Hidden;
+            var tab = (Border)Tabs.Children[i];
+            tab.BorderBrush = shown ? Underline : Brushes.Transparent;
+            ((TextBlock)tab.Child).Foreground = shown ? Shown : NotShown;
+        }
+    }
+
+    internal int ShownTab()
+    {
+        for (var i = 0; i < Pages.Children.Count; i++)
+            if (Pages.Children[i].Visibility == Visibility.Visible) return i;
+        return 0;
+    }
+
+    private void OnTab(object sender, MouseButtonEventArgs e) => ShowTab(Tabs.Children.IndexOf((UIElement)sender));
+
+    /// <summary>Ctrl+Tab and Ctrl+PageDown go to the next tab, as in any tabbed window.</summary>
+    private void OnKey(object sender, KeyEventArgs e)
+    {
+        if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) return;
+        var step = e.Key switch
+        {
+            Key.Tab => Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? -1 : 1,
+            Key.PageDown => 1,
+            Key.PageUp => -1,
+            _ => 0,
+        };
+        if (step == 0) return;
+        var count = Pages.Children.Count;
+        ShowTab((ShownTab() + step + count) % count);
+        e.Handled = true;
+    }
+
+    private void OnDrag(object sender, MouseButtonEventArgs e)
+    {
+        // Not from the "x": the drag would take the click that closes.
+        if (e.ButtonState == MouseButtonState.Pressed && !ReferenceEquals(e.OriginalSource, CloseGlyph)) DragMove();
+    }
+
+    private void OnClose(object sender, MouseButtonEventArgs e) => Close();
+
+    private static Brush Frozen(string color)
+    {
+        var brush = (Brush)new BrushConverter().ConvertFromString(color)!;
+        brush.Freeze();
+        return brush;
+    }
+
+    // ---- save ------------------------------------------------------------------------------
 
     private void OnSave(object sender, RoutedEventArgs e)
+    {
+        if (!TryRead()) return;
+        SetAutoStart(AutoStart.IsChecked == true);
+        DialogResult = true;
+    }
+
+    /// <summary>Reads the fields into Result; false, with the error shown and the field in front, when one is wrong.</summary>
+    internal bool TryRead()
     {
         if (!TimeSpan.TryParse(From.Text, out var from) || !TimeSpan.TryParse(To.Text, out var to) ||
             from.TotalHours >= 24 || to.TotalHours > 24)
         {
-            Fail("Horas no formato HH:mm, por exemplo 08:00 e 20:00.");
-            return;
+            Fail("Horas no formato HH:mm, por exemplo 08:00 e 20:00.", TimeSpan.TryParse(From.Text, out var f) && f.TotalHours < 24 ? To : From);
+            return false;
         }
         var scheduled = ModeSchedule.IsChecked == true;
         var slots = AutoHello.ParseSchedule(Schedule.Text);
@@ -73,37 +187,32 @@ public partial class SettingsWindow : Window
             .Any(part => AutoHello.ParseSchedule(part).Count == 0);
         if (invalid || (scheduled && slots.Count == 0))
         {
-            Fail("Horas marcadas no formato HH:mm, separadas por vírgulas (ex. 07:00, 12:00, 17:00).");
-            return;
-        }
-        if (!int.TryParse(WarnAt.Text, out var warn) || !int.TryParse(CritAt.Text, out var crit) ||
-            warn < 1 || crit > 100 || warn >= crit)
-        {
-            Fail("Limiares entre 1 e 100, com o amarelo abaixo do vermelho.");
-            return;
+            Fail("Horas marcadas no formato HH:mm, separadas por vírgulas (ex. 07:00, 12:00, 17:00).", Schedule);
+            return false;
         }
 
-        if (!int.TryParse(RefreshMinutes.Text, out var refresh) || refresh < 0 || refresh > 1440)
+        const string colours = "Cores das barras: entre 1 e 100, com o amarelo abaixo do vermelho.";
+        if (!Int(WarnAt, 1, 99, out var warn)) { Fail(colours, WarnAt); return false; }
+        if (!Int(CritAt, 2, 100, out var crit) || warn >= crit) { Fail(colours, CritAt); return false; }
+
+        if (!Int(RefreshMinutes, 0, 1440, out var refresh))
         {
-            Fail("Intervalo de atualização entre 0 e 1440 minutos.");
-            return;
+            Fail("Atualização dos limites: entre 0 e 1440 minutos.", RefreshMinutes);
+            return false;
         }
 
-        if (!int.TryParse(MinTask.Text, out var minTask) || minTask < 0 ||
-            !int.TryParse(Remind.Text, out var remind) || remind < 0 ||
-            !int.TryParse(StallMinutes.Text, out var stall) || stall < 0 || stall > 1440)
-        {
-            Fail("Avisos: segundos e minutos têm de ser números a partir de 0 (tarefa sem avançar: até 1440).");
-            return;
-        }
+        const string alerts = "Avisos: segundos e minutos têm de ser números a partir de 0 (tarefa sem avançar: até 1440).";
+        if (!Int(MinTask, 0, int.MaxValue, out var minTask)) { Fail(alerts, MinTask); return false; }
+        if (!Int(Remind, 0, int.MaxValue, out var remind)) { Fail(alerts, Remind); return false; }
+        if (!Int(StallMinutes, 0, 1440, out var stall)) { Fail(alerts, StallMinutes); return false; }
 
         var hotkey = "";
         if (!string.IsNullOrWhiteSpace(HotkeyBox.Text))
         {
             if (!Hotkey.TryParse(HotkeyBox.Text, out var mods, out var vk))
             {
-                Fail("Atalho: teclas modificadoras e uma tecla, por exemplo Ctrl+Alt+C ou Ctrl+Shift+F9 (vazio = sem atalho).");
-                return;
+                Fail("Atalho: teclas modificadoras e uma tecla, por exemplo Ctrl+Alt+C ou Ctrl+Shift+F9 (vazio = sem atalho).", HotkeyBox);
+                return false;
             }
             hotkey = Hotkey.Format(mods, vk);
         }
@@ -113,35 +222,32 @@ public partial class SettingsWindow : Window
         {
             if (!int.TryParse(part, out var level) || level < 1 || level > 100)
             {
-                Fail("Avisos de uso: percentagens entre 1 e 100, separadas por vírgulas (ex. 80, 95).");
-                return;
+                Fail("Avisos de uso: percentagens entre 1 e 100, separadas por vírgulas (ex. 80, 95).", Levels);
+                return false;
             }
             levels.Add(level);
         }
 
-        if (!int.TryParse(DayStartHour.Text, out var dayStart) || dayStart < 0 || dayStart > 12)
+        if (!Int(DayStartHour, 0, 12, out var dayStart))
         {
-            Fail("O dia começa a uma hora entre 0 e 12 (ex. 4 para as 4:00).");
-            return;
+            Fail("O dia começa a uma hora entre 0 e 12 (ex. 4 para as 4:00).", DayStartHour);
+            return false;
         }
 
-        if (!int.TryParse(LeftoverAbove.Text, out var leftover) || leftover < 0 || leftover > 100)
+        if (!Int(LeftoverAbove, 0, 100, out var leftover))
         {
-            Fail("Aviso antes do reset semanal: uma percentagem entre 0 e 100 (0 = nunca).");
-            return;
+            Fail("Aviso antes do reset semanal: uma percentagem entre 0 e 100 (0 = nunca).", LeftoverAbove);
+            return false;
         }
 
-        if (!int.TryParse(QualityBelow.Text, out var qualityBelow) || qualityBelow < 0 || qualityBelow > 100 ||
-            !int.TryParse(FillAbove.Text, out var fillAbove) || fillAbove < 0 || fillAbove > 100)
-        {
-            Fail("Avisos de contexto: valores entre 0 e 100 (0 desliga esse aviso).");
-            return;
-        }
+        const string context = "Avisos de contexto: valores entre 0 e 100 (0 desliga esse aviso).";
+        if (!Int(QualityBelow, 0, 100, out var qualityBelow)) { Fail(context, QualityBelow); return false; }
+        if (!Int(FillAbove, 0, 100, out var fillAbove)) { Fail(context, FillAbove); return false; }
 
-        if (!int.TryParse(HideIdle.Text, out var hideIdle) || hideIdle < 0 || hideIdle > 10080)
+        if (!Int(HideIdle, 0, 10080, out var hideIdle))
         {
-            Fail("Esconder sessões do Desktop: minutos entre 0 e 10080 (0 = nunca).");
-            return;
+            Fail("Esconder sessões do Desktop: minutos entre 0 e 10080 (0 = nunca).", HideIdle);
+            return false;
         }
 
         Result = new Config
@@ -198,8 +304,7 @@ public partial class SettingsWindow : Window
             ClearOfToasts = _original.ClearOfToasts,
         };
 
-        SetAutoStart(AutoStart.IsChecked == true);
-        DialogResult = true;
+        return true;
     }
 
     /// <summary>Set when the user asked to remove the widget; the main window does it, then exits.</summary>
@@ -214,10 +319,22 @@ public partial class SettingsWindow : Window
         DialogResult = false;
     }
 
-    private void Fail(string message)
+    private static bool Int(TextBox box, int min, int max, out int value) =>
+        int.TryParse(box.Text.Trim(), out value) && value >= min && value <= max;
+
+    /// <summary>Says what is wrong, and takes you to the field: its tab, the cursor in it.</summary>
+    private void Fail(string message, TextBox field)
     {
         Error.Text = message;
         Error.Visibility = Visibility.Visible;
+        for (DependencyObject? at = field; at is not null; at = LogicalTreeHelper.GetParent(at))
+        {
+            if (at is not UIElement element || Pages.Children.IndexOf(element) is not (>= 0 and var page)) continue;
+            ShowTab(page);
+            break;
+        }
+        field.Focus();
+        field.SelectAll();
     }
 
     internal static bool IsAutoStart()

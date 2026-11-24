@@ -331,7 +331,7 @@ public static class Diagnostics
 
     // ---- helpers -----------------------------------------------------------
 
-    private static string Version()
+    internal static string Version()
     {
         var v = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "?";
         // "1.0.0+<full commit hash>": the short hash is enough to find the commit.
