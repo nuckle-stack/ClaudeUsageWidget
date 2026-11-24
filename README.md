@@ -103,6 +103,9 @@ Cobrem:
 - a vigia do formato dos ficheiros do Claude Code (cada sinal, a espera de 5
   minutos, o aviso uma vez por versão), a parte do dia do limite semanal e o
   resumo de cada semana;
+- o aviso de que sobra muito da semana e a lista das semanas, com resets em
+  dias e horas diferentes: cada conta tem o seu, e pode mudar de uma semana
+  para a outra;
 - as atualizações e o diagnóstico, incluindo o que ele não pode levar: nomes de
   sessões, valores de variáveis, a pasta do utilizador;
 - o `ClaudeUsageFeed.exe`: a junção das leituras de várias sessões, as escritas

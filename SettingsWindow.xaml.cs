@@ -43,6 +43,7 @@ public partial class SettingsWindow : Window
         BudgetAlert.IsChecked = cfg.UsageAlerts.DailyBudget;
         BudgetWeekdays.IsChecked = cfg.UsageAlerts.BudgetWeekdaysOnly;
         DayStartHour.Text = cfg.UsageAlerts.DayStartHour.ToString();
+        LeftoverAbove.Text = cfg.UsageAlerts.LeftoverAbove.ToString();
         ContextEnabled.IsChecked = cfg.ContextAlerts.Enabled;
         QualityBelow.Text = cfg.ContextAlerts.QualityBelow.ToString();
         FillAbove.Text = cfg.ContextAlerts.FillAbove.ToString();
@@ -124,6 +125,12 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        if (!int.TryParse(LeftoverAbove.Text, out var leftover) || leftover < 0 || leftover > 100)
+        {
+            Fail("Aviso antes do reset semanal: uma percentagem entre 0 e 100 (0 = nunca).");
+            return;
+        }
+
         if (!int.TryParse(QualityBelow.Text, out var qualityBelow) || qualityBelow < 0 || qualityBelow > 100 ||
             !int.TryParse(FillAbove.Text, out var fillAbove) || fillAbove < 0 || fillAbove > 100)
         {
@@ -154,6 +161,7 @@ public partial class SettingsWindow : Window
                 DailyBudget = BudgetAlert.IsChecked == true,
                 BudgetWeekdaysOnly = BudgetWeekdays.IsChecked == true,
                 DayStartHour = dayStart,
+                LeftoverAbove = leftover,
             },
             Alerts = new AlertsConfig
             {

@@ -422,6 +422,18 @@ public partial class MainWindow : Window
             Notify(title, text, Forms.ToolTipIcon.Warning, 8000, OpenSessions);
             if (_cfg.Alerts.Sound) System.Media.SystemSounds.Exclamation.Play();
         }
+
+        // Not a warning: a chance. A notification replaces the one on screen, so
+        // it waits for a reading with no warning to give. A click shows what the
+        // week went on so far.
+        if (alerts.Count > 0) return;
+        if (_history.PendingLeftoverAlert(DateTime.Now, _cfg.UsageAlerts) is var (leftTitle, leftText))
+        {
+            Log.Write($"Aviso de uso{(Quiet ? " [silenciado]" : "")}: {leftTitle} — {leftText}");
+            if (Quiet) return;
+            Notify(leftTitle, leftText, Forms.ToolTipIcon.Info, 10000, () => OpenWeek(showLast: false));
+            if (_cfg.Alerts.Sound) System.Media.SystemSounds.Asterisk.Play();
+        }
     }
 
     private DailyBudget? TodayBudget() => _history.Budget(DateTime.Now, _cfg.UsageAlerts.BudgetWeekdaysOnly, _cfg.UsageAlerts.DayStartHour);

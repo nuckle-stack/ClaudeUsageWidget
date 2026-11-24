@@ -170,6 +170,11 @@ public class UsageAlertsConfig
     public bool BudgetWeekdaysOnly { get; set; } = true;
     /// <summary>The hour "today" starts at for the daily share, so a late night counts with its evening.</summary>
     public int DayStartHour { get; set; } = 4;
+    /// <summary>
+    /// Announce, once a week and two days before the reset (as the daily share
+    /// counts days), when at least this much of the week is still unused. 0 = never.
+    /// </summary>
+    public int LeftoverAbove { get; set; } = 40;
 }
 
 public class Config

@@ -184,6 +184,48 @@ public class WeekTests
         Assert.Equal(Unix(Local(24, 9)), kept.SourcesAsOf);
     }
 
+    // ---- the list of weeks -------------------------------------------------------------------
+
+    [Fact]
+    public void Weeks_are_listed_newest_first_by_their_own_dates()
+    {
+        // Another account: its weeks end on Fridays at 09:00, until the reset moved to a Saturday at 15:00.
+        WeekSummary W(DateTime reset, double used, int maxed = 0) => new() { ResetAt = Unix(reset), Used = used, FiveHourMaxed = maxed };
+        var closed = new List<WeekSummary> { W(Local(6, 9), 30), W(Local(13, 9), 45, maxed: 2), W(Local(21, 15), 80, maxed: 1) };
+        var current = W(Local(28, 15), 12);
+
+        var lines = WeekReport.History(closed, current, Unix(Local(23, 10)));
+        Assert.Equal(["esta semana", "14/11 – 21/11", "06/11 – 13/11", "30/10 – 06/11"], lines.Select(l => l.Label));
+        Assert.True(lines[0].Running);
+        Assert.False(lines[1].Running);
+        Assert.Equal("sex 6/11 09:00 → sex 13/11 09:00: 45% do limite semanal; a janela de 5h esgotou 2 vezes.", lines[2].Tip);
+        Assert.Equal("sáb 21/11 15:00 → sáb 28/11 15:00 (em curso): 12% do limite semanal; a janela de 5h não esgotou.", lines[0].Tip);
+        Assert.Equal("Média das últimas 3: 52% por semana", WeekReport.Average(closed));
+    }
+
+    [Fact]
+    public void The_running_week_is_listed_once_and_one_week_has_no_average()
+    {
+        var closed = new List<WeekSummary> { new() { ResetAt = Reset, Used = 45 } };
+        var lines = WeekReport.History(closed, new WeekSummary { ResetAt = Reset + 2, Used = 45 }, Unix(Local(24, 12)));
+        Assert.Equal("esta semana", Assert.Single(lines).Label);
+        Assert.Equal("", WeekReport.Average(closed));
+        Assert.Empty(WeekReport.History([], null, Unix(Local(24, 12))));
+    }
+
+    [Fact]
+    public void A_week_ending_on_a_Friday_morning_is_summed_up_by_its_own_days()
+    {
+        var reset = Unix(Local(27, 9));   // Friday 27 at 09:00: the week began on Friday 20 at 09:00
+        Sample[] samples = [S(Local(20, 10), 2, r7: reset), S(Local(23, 20), 30, r7: reset), S(Local(27, 8), 50, r7: reset)];
+        var week = WeekReport.Build(samples, reset, Use(), Unix(Local(27, 12)))!;
+        Assert.Equal(Local(20, 0), week.Days[0].Date);
+        Assert.Equal(Local(27, 0), week.Days[^1].Date);
+        Assert.Equal(8, week.Days.Count);   // Friday morning to the next Friday morning
+        Assert.Equal(28, week.Days.Single(d => d.Date == Local(23, 0)).Percent);
+        Assert.False(week.Gaps);
+    }
+
     [Fact]
     public void Only_the_last_12_weeks_are_kept()
     {

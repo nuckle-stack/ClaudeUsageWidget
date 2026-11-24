@@ -33,6 +33,9 @@ public class WeekSummary
     [JsonIgnore] public DayUse? Heaviest => Days.Where(d => d.Percent >= 0.5).MaxBy(d => d.Percent);
 }
 
+/// <summary>One week in the list of weeks: the running one reads "esta semana".</summary>
+public record WeekLine(WeekSummary Week, string Label, string Tip, bool Running);
+
 public class WeeksFile
 {
     public List<WeekSummary> Weeks { get; set; } = new();
@@ -112,6 +115,35 @@ public static class WeekReport
         if (week.FiveHourMaxed > 0) text += week.FiveHourMaxed == 1 ? " A janela de 5h esgotou uma vez." : $" A janela de 5h esgotou {week.FiveHourMaxed} vezes.";
         return text;
     }
+
+    /// <summary>
+    /// The weeks kept and the one running, newest first. Each is labelled by
+    /// its own dates: an account's week ends on its own day and hour, and it
+    /// can move (after a week without use, say), leaving a gap between two.
+    /// </summary>
+    public static List<WeekLine> History(IReadOnlyList<WeekSummary> closed, WeekSummary? current, long now)
+    {
+        var weeks = closed.Where(w => current is null || Math.Abs(w.ResetAt - current.ResetAt) > 3600).ToList();
+        if (current is not null) weeks.Add(current);
+        return weeks.OrderByDescending(w => w.ResetAt).Select(w =>
+        {
+            var (from, to) = (Local(w.Start), Local(w.ResetAt));
+            var running = w.ResetAt > now;
+            var maxed = w.FiveHourMaxed switch
+            {
+                0 => "a janela de 5h não esgotou",
+                1 => "a janela de 5h esgotou uma vez",
+                var n => $"a janela de 5h esgotou {n} vezes",
+            };
+            var tip = $"{DayLabel(from)}/{from:MM} {from:HH:mm} → {DayLabel(to)}/{to:MM} {to:HH:mm}" +
+                      $"{(running ? " (em curso)" : "")}: {Pct(w.Used)} do limite semanal; {maxed}.";
+            return new WeekLine(w, running ? "esta semana" : $"{from:dd/MM} – {to:dd/MM}", tip, running);
+        }).ToList();
+    }
+
+    /// <summary>"Média das últimas 4: 42% por semana"; empty with fewer than two weeks ended.</summary>
+    public static string Average(IReadOnlyList<WeekSummary> closed) =>
+        closed.Count < 2 ? "" : $"Média das últimas {closed.Count}: {Pct(closed.Average(w => w.Used))} por semana";
 
     public static string Pct(double p) => p is > 0 and < 1 ? "<1%" : $"{Math.Round(p)}%";
 

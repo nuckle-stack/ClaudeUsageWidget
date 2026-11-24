@@ -30,6 +30,8 @@ public class HistoryFile
     public long Renewed7 { get; set; }
     /// <summary>The day (yyyy-MM-dd, local) whose over-budget alert was already given.</summary>
     public string BudgetDay { get; set; } = "";
+    /// <summary>The weekly window (its resetsAt) whose "still left" alert was already given.</summary>
+    public long Leftover7 { get; set; }
 }
 
 /// <summary>Today's slice of the weekly limit, in percentage points of it.</summary>
@@ -311,6 +313,44 @@ public class UsageHistory
         return ("Parte de hoje do limite semanal gasta",
             $"Hoje já usaste {Math.Round(b.UsedToday)}% do limite semanal, mais do que os {Math.Round(b.Allowance)}% " +
             $"que cabem por dia até ao reset ({reset}).{rest}");
+    }
+
+    /// <summary>
+    /// Once a week, when only two days that count are left before the reset
+    /// (today and one more, counted as for today's share) and at least
+    /// cfg.LeftoverAbove percent of the week is still unused: what is left does
+    /// not carry over. The reset is each account's own, from the readings.
+    /// </summary>
+    public (string Title, string Text)? PendingLeftoverAlert(DateTime nowLocal, UsageAlertsConfig cfg)
+    {
+        if (cfg.LeftoverAbove <= 0) return null;
+        var last = _file.Samples.LastOrDefault(s => s.R7 > 0);
+        if (last is null || Math.Abs(_file.Leftover7 - last.R7) <= 60) return null;
+        var left = 100 - last.P7;
+        // Within the last hour it is too late to be of use.
+        if (left < cfg.LeftoverAbove || last.R7 - new DateTimeOffset(nowLocal).ToUnixTimeSeconds() < 3600) return null;
+
+        var reset = DateTimeOffset.FromUnixTimeSeconds(last.R7);
+        var shift = TimeSpan.FromHours(-cfg.DayStartHour);
+        if (DaysToShare(nowLocal + shift, reset.LocalDateTime + shift, cfg.BudgetWeekdaysOnly) > 2) return null;
+        _file.Leftover7 = last.R7;
+        Save();
+
+        return ($"Ainda tens {Math.Floor(left)}% do limite semanal",
+            $"Renova {DayAndTime(reset, nowLocal)} e o que sobrar não passa para a semana seguinte.");
+    }
+
+    /// <summary>"hoje às 18:00", "amanhã às 18:00", "segunda às 09:00".</summary>
+    internal static string DayAndTime(DateTimeOffset at, DateTime nowLocal)
+    {
+        var local = at.LocalDateTime;
+        var day = (local.Date - nowLocal.Date).Days switch
+        {
+            0 => "hoje",
+            1 => "amanhã",
+            _ => WeekReport.DayName(local),
+        };
+        return $"{day} às {local:HH:mm}";
     }
 
     private static (double Percent, long ResetsAt) Pick(Sample s, bool fiveHour) =>

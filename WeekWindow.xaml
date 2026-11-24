@@ -22,42 +22,74 @@
                 <TextBlock Grid.Column="2" Text="{Binding Value}" Foreground="#B3FFFFFF" TextAlignment="Right"/>
             </Grid>
         </DataTemplate>
+        <!-- A week in the list of weeks: its dates, its use, how often the 5-hour window ran out. A click opens it. -->
+        <DataTemplate x:Key="WeekRow">
+            <Grid x:Name="Row" Margin="0,1" Background="Transparent" ToolTip="{Binding Tip}" Cursor="Hand" MouseLeftButtonUp="OnWeekRow">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="40"/>
+                    <ColumnDefinition Width="28"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding Label}" Foreground="#E6FFFFFF" TextTrimming="CharacterEllipsis" Margin="0,1,8,1"/>
+                <Border Grid.Column="1" Height="5" CornerRadius="2.5" Background="#1FFFFFFF" VerticalAlignment="Center">
+                    <Border Width="{Binding BarWidth}" HorizontalAlignment="Left" CornerRadius="2.5" Background="{Binding BarBrush}"/>
+                </Border>
+                <TextBlock Grid.Column="2" Text="{Binding Value}" Foreground="#B3FFFFFF" TextAlignment="Right" Margin="0,1"/>
+                <TextBlock Grid.Column="3" Text="{Binding Maxed}" Foreground="#FB923C" TextAlignment="Right" Margin="0,1"/>
+            </Grid>
+            <DataTemplate.Triggers>
+                <Trigger SourceName="Row" Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Row" Property="Background" Value="#14FFFFFF"/>
+                </Trigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
     </Window.Resources>
     <Border CornerRadius="8" Background="#F815151A" BorderBrush="#30FFFFFF" BorderThickness="1" Padding="12,10">
         <StackPanel>
             <Grid>
-                <TextBlock Text="Resumo da semana" Foreground="#99FFFFFF" FontWeight="SemiBold"/>
+                <TextBlock x:Name="Heading" Text="Resumo da semana" Foreground="#99FFFFFF" FontWeight="SemiBold"/>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
                     <TextBlock x:Name="TabNow" Text="esta" FontSize="10" Cursor="Hand" Padding="4,0" MouseLeftButtonUp="OnTabNow"/>
-                    <TextBlock x:Name="TabLast" Text="anterior" FontSize="10" Cursor="Hand" Padding="4,0,0,0" MouseLeftButtonUp="OnTabLast"/>
+                    <TextBlock x:Name="TabLast" Text="anterior" FontSize="10" Cursor="Hand" Padding="4,0" MouseLeftButtonUp="OnTabLast"/>
+                    <TextBlock x:Name="TabWeeks" Text="semanas" FontSize="10" Cursor="Hand" Padding="4,0,0,0" MouseLeftButtonUp="OnTabWeeks"/>
                 </StackPanel>
             </Grid>
             <TextBlock x:Name="Period" Foreground="#80FFFFFF" FontSize="10" Margin="0,2,0,8"/>
 
-            <TextBlock x:Name="Total" Foreground="#F2FFFFFF" FontSize="15" FontWeight="SemiBold"/>
-            <TextBlock x:Name="Compare" Foreground="#99FFFFFF" FontSize="10" Margin="0,1,0,4"/>
-            <Border Height="6" CornerRadius="3" Background="#1FFFFFFF" Margin="0,0,0,12">
-                <Border x:Name="TotalBar" HorizontalAlignment="Left" CornerRadius="3" Background="#60A5FA"/>
-            </Border>
+            <StackPanel x:Name="Detail">
+                <TextBlock x:Name="Total" Foreground="#F2FFFFFF" FontSize="15" FontWeight="SemiBold"/>
+                <TextBlock x:Name="Compare" Foreground="#99FFFFFF" FontSize="10" Margin="0,1,0,4"/>
+                <Border Height="6" CornerRadius="3" Background="#1FFFFFFF" Margin="0,0,0,12">
+                    <Border x:Name="TotalBar" HorizontalAlignment="Left" CornerRadius="3" Background="#60A5FA"/>
+                </Border>
 
-            <TextBlock Text="Por dia" Foreground="#99FFFFFF" FontWeight="SemiBold" Margin="0,0,0,3"/>
-            <ItemsControl x:Name="DayList" ItemTemplate="{StaticResource BarRow}" Margin="0,0,0,12"/>
+                <TextBlock Text="Por dia" Foreground="#99FFFFFF" FontWeight="SemiBold" Margin="0,0,0,3"/>
+                <ItemsControl x:Name="DayList" ItemTemplate="{StaticResource BarRow}" Margin="0,0,0,12"/>
 
-            <StackPanel x:Name="SourceBox">
-                <TextBlock Text="De onde veio" Foreground="#99FFFFFF" FontWeight="SemiBold" Margin="0,0,0,3"
-                           ToolTip="A repartição que o /usage do Claude Code mostra. Ao contrário dos projetos, inclui o claude.ai, o Cowork e o Claude Code noutros PCs."/>
-                <ItemsControl x:Name="SourceList" ItemTemplate="{StaticResource BarRow}"/>
-                <TextBlock x:Name="SourceWhen" Foreground="#80FFFFFF" FontSize="10" Margin="0,2,0,12" TextWrapping="Wrap"/>
+                <StackPanel x:Name="SourceBox">
+                    <TextBlock Text="De onde veio" Foreground="#99FFFFFF" FontWeight="SemiBold" Margin="0,0,0,3"
+                               ToolTip="A repartição que o /usage do Claude Code mostra. Ao contrário dos projetos, inclui o claude.ai, o Cowork e o Claude Code noutros PCs."/>
+                    <ItemsControl x:Name="SourceList" ItemTemplate="{StaticResource BarRow}"/>
+                    <TextBlock x:Name="SourceWhen" Foreground="#80FFFFFF" FontSize="10" Margin="0,2,0,12" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <StackPanel x:Name="ProjectBox">
+                    <TextBlock Text="Projetos neste PC" Foreground="#99FFFFFF" FontWeight="SemiBold" Margin="0,0,0,3"
+                               ToolTip="Reparte o uso do Claude Code neste PC pelo custo equivalente na API; não inclui o claude.ai nem outros PCs."/>
+                    <ItemsControl x:Name="ProjectList" ItemTemplate="{StaticResource BarRow}" Margin="0,0,0,12"/>
+                </StackPanel>
+
+                <TextBlock x:Name="FiveHour" Foreground="#B3FFFFFF" FontSize="10"/>
+                <TextBlock x:Name="Note" Foreground="#80FFFFFF" FontSize="10" Margin="0,4,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
             </StackPanel>
 
-            <StackPanel x:Name="ProjectBox">
-                <TextBlock Text="Projetos neste PC" Foreground="#99FFFFFF" FontWeight="SemiBold" Margin="0,0,0,3"
-                           ToolTip="Reparte o uso do Claude Code neste PC pelo custo equivalente na API; não inclui o claude.ai nem outros PCs."/>
-                <ItemsControl x:Name="ProjectList" ItemTemplate="{StaticResource BarRow}" Margin="0,0,0,12"/>
+            <StackPanel x:Name="History" Visibility="Collapsed">
+                <TextBlock x:Name="Average" Foreground="#F2FFFFFF" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <ItemsControl x:Name="WeekList" ItemTemplate="{StaticResource WeekRow}"/>
+                <TextBlock x:Name="HistoryNote" Foreground="#80FFFFFF" FontSize="10" Margin="0,8,0,0" TextWrapping="Wrap"/>
             </StackPanel>
 
-            <TextBlock x:Name="FiveHour" Foreground="#B3FFFFFF" FontSize="10"/>
-            <TextBlock x:Name="Note" Foreground="#80FFFFFF" FontSize="10" Margin="0,4,0,0" TextWrapping="Wrap" Visibility="Collapsed"/>
             <TextBlock x:Name="Empty" Foreground="#99FFFFFF" TextWrapping="Wrap" Visibility="Collapsed"
                        Text="Ainda não há leituras suficientes desta semana. O resumo enche-se à medida que o widget recebe os limites."/>
         </StackPanel>

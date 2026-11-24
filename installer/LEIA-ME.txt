@@ -67,7 +67,10 @@ USAR
     janela de 5h esgotou; também a semana anterior. Quando a semana renova, o
     widget mostra o resumo da que acabou. Se abriste o /usage do Claude Code
     nessa semana, mostra também de onde veio o uso (Claude Code, conversas no
-    claude.ai, Cowork), incluindo o que os projetos deste PC não veem.
+    claude.ai, Cowork), incluindo o que os projetos deste PC não veem. Em
+    "semanas": as últimas 12 semanas e a que está a decorrer, com quanto
+    usaste em cada uma, a média e quantas vezes a janela de 5h esgotou. Clica
+    numa semana para ver o resumo dela.
   - "Recentes", no fim da lista de sessões: as sessões do terminal e do VS
     Code dos últimos 7 dias que já fechaste. Um clique abre um separador novo
     do Windows Terminal (ou uma consola) na pasta dela, com a conversa
@@ -89,6 +92,12 @@ USAR
     úteis até ao reset. O dia começa às 4:00, para uma noite tardia contar com
     a véspera; nas Definições mudas essa hora e podes contar também os fins de
     semana. Se hoje passares a tua parte, o widget avisa uma vez.
+  - Antes do reset semanal: quando faltam dois dias (hoje e o seguinte,
+    contados como na parte de hoje) e ainda sobra 40% ou mais, o widget avisa
+    uma vez ("Ainda tens 62% do limite semanal. Renova amanhã às 18:00 e o que
+    sobrar não passa para a semana seguinte."). O dia e a hora do reset são os
+    da tua conta, que podem não ser os de um colega. A percentagem muda-se
+    nas Definições (0 desliga).
   - "Consumo", na lista de sessões: quanto da janela de 5h (ou da semana)
     gastou cada projeto e cada sessão. É uma estimativa: reparte o uso do
     Claude Code neste PC pelo custo equivalente na API (o Opus pesa mais do

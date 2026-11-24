@@ -118,7 +118,8 @@ public static class Diagnostics
             : "desligados"));
         var usage = cfg.UsageAlerts;
         Line($"Avisos de uso: níveis {(usage.Levels.Length > 0 ? string.Join(", ", usage.Levels) + "%" : "nenhum")} · ritmo {YesNo(usage.Forecast)} · " +
-             $"parte do dia {YesNo(usage.DailyBudget)}{(usage.BudgetWeekdaysOnly ? " (dias úteis)" : " (todos os dias)")}");
+             $"parte do dia {YesNo(usage.DailyBudget)}{(usage.BudgetWeekdaysOnly ? " (dias úteis)" : " (todos os dias)")} · " +
+             $"sobra da semana {(usage.LeftoverAbove > 0 ? $"a partir de {usage.LeftoverAbove}%" : "desligado")}");
         Line($"Avisos de contexto: {(cfg.ContextAlerts.Enabled ? $"qualidade abaixo de {cfg.ContextAlerts.QualityBelow}, ocupação acima de {cfg.ContextAlerts.FillAbove}%" : "desligados")}");
         Line($"Atalho: {live.Hotkey}");
         Line($"Versões novas: {(live.Updates.Length > 0 ? live.Updates : (live.Config.CheckUpdates ? "ligado" : "desligado"))}");

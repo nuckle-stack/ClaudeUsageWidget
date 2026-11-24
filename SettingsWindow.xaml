@@ -79,6 +79,12 @@
             <TextBox x:Name="DayStartHour" Width="30" Margin="8,0" TextAlignment="Center"/>
             <TextBlock Text="h (uma noite tardia conta com a véspera)" VerticalAlignment="Center"/>
         </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock Text="Avisar antes do reset semanal se ainda sobrar" VerticalAlignment="Center"/>
+            <TextBox x:Name="LeftoverAbove" Width="36" Margin="8,0" TextAlignment="Center"
+                     ToolTip="Uma vez por semana, quando faltam dois dias para o reset (hoje e o seguinte, contados como na parte diária: só os úteis, se escolheste isso), se ainda sobrar pelo menos esta parte do limite semanal. O que sobra não passa para a semana seguinte. 0 = nunca."/>
+            <TextBlock Text="% ou mais" VerticalAlignment="Center"/>
+        </StackPanel>
         <CheckBox x:Name="ContextEnabled" Margin="0,12,0,0"
                   Content="Avisar quando o contexto de uma sessão degrada"/>
         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
