@@ -1,0 +1,83 @@
+<UserControl x:Class="ClaudeUsageWidget.NoticeCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="320" FontFamily="Segoe UI" FontSize="11"
+             UseLayoutRounding="True" SnapsToDevicePixels="True">
+    <!-- The widget's own look: the dark rounded panel, its greys, its bars; a stripe in the notice's colour. -->
+    <Border x:Name="Frame" CornerRadius="8" Background="#F815151A" BorderBrush="#30FFFFFF" BorderThickness="1"
+            Cursor="Hand" MouseLeftButtonUp="OnBody">
+        <Grid Margin="12,10,10,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Border x:Name="Stripe" CornerRadius="1.5" Margin="0,1"/>
+
+            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                <Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="Kind" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <Border x:Name="BadgeBox" CornerRadius="3" Padding="5,0" Margin="7,0,0,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="Badge" FontSize="10" FontWeight="SemiBold"/>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock x:Name="When" Text="agora" Foreground="#80FFFFFF" FontSize="10" VerticalAlignment="Center"/>
+                        <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="9" Padding="8,2,2,2"
+                                   VerticalAlignment="Center" Background="Transparent" ToolTip="Fechar"
+                                   MouseLeftButtonUp="OnClose">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="#80FFFFFF"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Foreground" Value="#F2FFFFFF"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock x:Name="Subject" Foreground="#F2FFFFFF" FontSize="12.5" FontWeight="SemiBold"
+                           TextWrapping="Wrap" Margin="0,4,0,0"/>
+                <TextBlock x:Name="Text" Foreground="#B3FFFFFF" TextWrapping="Wrap" LineHeight="15" Margin="0,2,0,0"/>
+
+                <!-- The widget's bar, for a notice about a limit. -->
+                <Grid x:Name="BarBox" Margin="0,7,0,1" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="36"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="BarLabel" Foreground="#99FFFFFF" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <Border x:Name="Track" Grid.Column="1" Height="6" CornerRadius="3" Background="#26FFFFFF"
+                            Margin="7,0" VerticalAlignment="Center">
+                        <Border x:Name="BarFill" Height="6" CornerRadius="3" HorizontalAlignment="Left"/>
+                    </Border>
+                    <TextBlock x:Name="BarValue" Grid.Column="2" Foreground="#F2FFFFFF" FontWeight="SemiBold"
+                               TextAlignment="Right" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="BarTime" Grid.Column="3" Foreground="#99FFFFFF" Margin="8,0,0,0"
+                               VerticalAlignment="Center"/>
+                </Grid>
+
+                <Border x:Name="ActionBox" HorizontalAlignment="Right" CornerRadius="4" Padding="9,3" Margin="0,8,0,0"
+                        MouseLeftButtonUp="OnAction" Visibility="Collapsed">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="#1AFFFFFF"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#30FFFFFF"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock x:Name="ActionText" FontWeight="SemiBold"/>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

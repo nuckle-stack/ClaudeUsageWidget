@@ -1,0 +1,10 @@
+<Window x:Class="ClaudeUsageWidget.NoticeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Avisos do Claude Usage"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" ShowActivated="False" ResizeMode="NoResize" SizeToContent="WidthAndHeight"
+        Topmost="True" UseLayoutRounding="True" SnapsToDevicePixels="True">
+    <!-- The notices, one above the other; the newest sits nearest the widget. -->
+    <StackPanel x:Name="Stack"/>
+</Window>

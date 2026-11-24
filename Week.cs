@@ -105,15 +105,25 @@ public static class WeekReport
     /// <summary>The notification when a week ends.</summary>
     public static string Message(WeekSummary week, WeekSummary? previous)
     {
-        var text = $"Usaste {Pct(week.Used)} do limite semanal";
+        var text = Headline(week);
         if (previous is not null) text += $" (na anterior, {Pct(previous.Used)})";
-        text += ".";
-        if (week.Heaviest is { } day) text += $" Dia mais pesado: {DayName(day.Date)} ({Pct(day.Percent)}).";
-        if (week.Projects.FirstOrDefault(p => p.Name != "outros") is { } top) text += $" Mais usado: {top.Name} ({Pct(top.Share * 100)}).";
+        return string.Join(" ", new[] { text + "." }.Concat(Facts(week)));
+    }
+
+    /// <summary>The notice's main line: "Usaste 45% do limite semanal".</summary>
+    public static string Headline(WeekSummary week) => $"Usaste {Pct(week.Used)} do limite semanal";
+
+    /// <summary>The rest of the notice: "Na anterior, 62%. Dia mais pesado: quarta (18%)…".</summary>
+    public static string NoticeText(WeekSummary week, WeekSummary? previous) =>
+        string.Join(" ", (previous is null ? [] : new[] { $"Na anterior, {Pct(previous.Used)}." }).Concat(Facts(week)));
+
+    private static IEnumerable<string> Facts(WeekSummary week)
+    {
+        if (week.Heaviest is { } day) yield return $"Dia mais pesado: {DayName(day.Date)} ({Pct(day.Percent)}).";
+        if (week.Projects.FirstOrDefault(p => p.Name != "outros") is { } top) yield return $"Mais usado: {top.Name} ({Pct(top.Share * 100)}).";
         var outside = week.Sources.Where(s => s.Key != "claude_code" && s.Points >= 0.5).ToList();
-        if (outside.Count > 0) text += $" Fora do Claude Code: {Pct(outside.Sum(s => s.Points))} ({string.Join(", ", outside.Select(s => s.Name))}).";
-        if (week.FiveHourMaxed > 0) text += week.FiveHourMaxed == 1 ? " A janela de 5h esgotou uma vez." : $" A janela de 5h esgotou {week.FiveHourMaxed} vezes.";
-        return text;
+        if (outside.Count > 0) yield return $"Fora do Claude Code: {Pct(outside.Sum(s => s.Points))} ({string.Join(", ", outside.Select(s => s.Name))}).";
+        if (week.FiveHourMaxed > 0) yield return week.FiveHourMaxed == 1 ? "A janela de 5h esgotou uma vez." : $"A janela de 5h esgotou {week.FiveHourMaxed} vezes.";
     }
 
     /// <summary>

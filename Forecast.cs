@@ -161,9 +161,9 @@ public class UsageHistory
         fiveHour ? at.LocalDateTime.ToString("HH:mm") : at.LocalDateTime.ToString("ddd HH", Pt).Replace(".", "") + "h";
 
     /// <summary>Threshold and pace alerts that have not been announced yet for the current windows.</summary>
-    public List<(string Title, string Text)> PendingAlerts(UsageAlertsConfig cfg)
+    public List<UsageAlert> PendingAlerts(UsageAlertsConfig cfg)
     {
-        var result = new List<(string, string)>();
+        var result = new List<UsageAlert>();
         var changed = false;
         foreach (var fiveHour in new[] { true, false })
         {
@@ -189,13 +189,16 @@ public class UsageHistory
                 // The level alert carries the pace warning when there is one.
                 if (running) mark.Forecast = true;
                 var extra = running ? " " + Capital(Describe(fiveHour)) + "." : "";
-                result.Add(($"{name} a {Math.Round(p.Percent)}%", reset + extra));
+                // Red from 90%, as the widget's bar turns red by default.
+                result.Add(new($"{name} a {Math.Round(p.Percent)}%", reset + extra, fiveHour, name,
+                    $"Já usaste {Math.Round(p.Percent)}%", p.Percent >= 90 ? NoticeTone.Crit : NoticeTone.Warn));
                 changed = true;
             }
             else if (cfg.Forecast && running && !mark.Forecast)
             {
                 mark.Forecast = true;
-                result.Add(($"{name}: ritmo alto", $"{Capital(Describe(fiveHour))}. Vai em {Math.Round(p.Percent)}%."));
+                result.Add(new($"{name}: ritmo alto", $"{Capital(Describe(fiveHour))}. Vai em {Math.Round(p.Percent)}%.", fiveHour, name,
+                    "Ritmo alto", NoticeTone.Warn));
                 changed = true;
             }
         }
@@ -208,9 +211,9 @@ public class UsageHistory
     /// paying for extra usage, and no longer are. Said once per window, and only
     /// within an hour of the reset; a widget started long after it stays quiet.
     /// </summary>
-    public List<(string Title, string Text)> PendingRenewals(long now)
+    public List<UsageAlert> PendingRenewals(long now)
     {
-        var result = new List<(string, string)>();
+        var result = new List<UsageAlert>();
         var changed = false;
         foreach (var fiveHour in new[] { true, false })
         {
@@ -224,8 +227,8 @@ public class UsageHistory
             if (fiveHour) _file.Renewed5 = resetsAt; else _file.Renewed7 = resetsAt;
             changed = true;
             if (now - resetsAt > 3600) continue;
-            result.Add((fiveHour ? "Limite de 5 horas renovado" : "Limite semanal renovado",
-                "Já podes voltar a usar o Claude normalmente."));
+            var name = fiveHour ? "Limite de 5 horas" : "Limite semanal";
+            result.Add(new($"{name} renovado", "Já podes voltar a usar o Claude normalmente.", null, name, "Renovado", NoticeTone.Done));
         }
         if (changed) Save();
         return result;
@@ -299,7 +302,7 @@ public class UsageHistory
     }
 
     /// <summary>Once a day, when today has taken more than its share of the week.</summary>
-    public (string Title, string Text)? PendingBudgetAlert(DateTime nowLocal, UsageAlertsConfig cfg)
+    public UsageAlert? PendingBudgetAlert(DateTime nowLocal, UsageAlertsConfig cfg)
     {
         if (!cfg.DailyBudget || Budget(nowLocal, cfg.BudgetWeekdaysOnly, cfg.DayStartHour) is not { Reliable: true, Over: true } b) return null;
         var day = DayStart(nowLocal, cfg.DayStartHour).ToString("yyyy-MM-dd");
@@ -310,9 +313,10 @@ public class UsageHistory
         var reset = When(DateTimeOffset.FromUnixTimeSeconds(b.ResetsAt), fiveHour: false);
         var left = b.Days - 1;
         var rest = left > 0 ? $" O que gastares a mais sai dos próximos {left} dia{(left == 1 ? "" : "s")}." : "";
-        return ("Parte de hoje do limite semanal gasta",
+        return new("Parte de hoje do limite semanal gasta",
             $"Hoje já usaste {Math.Round(b.UsedToday)}% do limite semanal, mais do que os {Math.Round(b.Allowance)}% " +
-            $"que cabem por dia até ao reset ({reset}).{rest}");
+            $"que cabem por dia até ao reset ({reset}).{rest}",
+            false, "Limite semanal", "Parte de hoje já gasta", NoticeTone.Warn);
     }
 
     /// <summary>
@@ -321,7 +325,7 @@ public class UsageHistory
     /// cfg.LeftoverAbove percent of the week is still unused: what is left does
     /// not carry over. The reset is each account's own, from the readings.
     /// </summary>
-    public (string Title, string Text)? PendingLeftoverAlert(DateTime nowLocal, UsageAlertsConfig cfg)
+    public UsageAlert? PendingLeftoverAlert(DateTime nowLocal, UsageAlertsConfig cfg)
     {
         if (cfg.LeftoverAbove <= 0) return null;
         var last = _file.Samples.LastOrDefault(s => s.R7 > 0);
@@ -336,8 +340,9 @@ public class UsageHistory
         _file.Leftover7 = last.R7;
         Save();
 
-        return ($"Ainda tens {Math.Floor(left)}% do limite semanal",
-            $"Renova {DayAndTime(reset, nowLocal)} e o que sobrar não passa para a semana seguinte.");
+        return new($"Ainda tens {Math.Floor(left)}% do limite semanal",
+            $"Renova {DayAndTime(reset, nowLocal)} e o que sobrar não passa para a semana seguinte.",
+            false, "Limite semanal", $"Ainda tens {Math.Floor(left)}% por usar", NoticeTone.Info);
     }
 
     /// <summary>"hoje às 18:00", "amanhã às 18:00", "segunda às 09:00".</summary>

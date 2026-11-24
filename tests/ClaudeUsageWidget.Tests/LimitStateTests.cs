@@ -74,7 +74,9 @@ public class LimitStateTests
         {
             Samples = [new Sample { T = reset - Day, P5 = 10, R5 = reset + Hour, P7 = 100, R7 = reset }],
         });
-        Assert.Equal("Limite semanal renovado", Assert.Single(history.PendingRenewals(Now)).Title);
+        var renewed = Assert.Single(history.PendingRenewals(Now));
+        Assert.Equal("Limite semanal renovado", renewed.Title);
+        Assert.Equal(("Limite semanal", "Renovado", NoticeTone.Done, (bool?)null), (renewed.Kind, renewed.Subject, renewed.Tone, renewed.FiveHour));
     }
 
     // ---- extra usage --------------------------------------------------------
@@ -94,6 +96,7 @@ public class LimitStateTests
 
         Assert.Equal("Uso extra pago ativo", alert!.Value.Title);
         Assert.StartsWith("O limite de 5 horas esgotou", alert.Value.Text);
+        Assert.Equal(("Limite de 5 horas", NoticeTone.Crit, (bool?)true), (alert.Value.Kind, alert.Value.Tone, alert.Value.FiveHour));
         Assert.Null(watch.Check(Ping(true), Now + 60));
 
         // The next window that runs out is news again.

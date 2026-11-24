@@ -330,7 +330,7 @@ public class OverageWatch
     private long _announced;
 
     /// <summary>The alert to show now, or null.</summary>
-    public (string Title, string Text)? Check(Limits ping, long now)
+    public UsageAlert? Check(Limits ping, long now)
     {
         if (ping.Overage is not { } o || !o.ActiveAt(now) || _announced == o.ResetsAt) return null;
         _announced = o.ResetsAt;
@@ -343,7 +343,9 @@ public class OverageWatch
             _ => "Um limite de utilização",
         };
         var until = UsageHistory.When(DateTimeOffset.FromUnixTimeSeconds(o.ResetsAt), fiveHour: !weekly);
-        return ("Uso extra pago ativo",
-            $"{limit} esgotou e o Claude continua com uso extra, cobrado à parte. Volta ao normal {until}.");
+        bool? bar = o.LimitType == "five_hour" ? true : weekly ? false : null;
+        return new("Uso extra pago ativo",
+            $"{limit} esgotou e o Claude continua com uso extra, cobrado à parte. Volta ao normal {until}.",
+            bar, bar switch { true => "Limite de 5 horas", false => "Limite semanal", _ => "Limites" }, "Uso extra pago ativo", NoticeTone.Crit);
     }
 }

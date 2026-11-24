@@ -118,11 +118,16 @@ public class ForecastTests
         var file = new HistoryFile { Samples = [Five(Now - Hour, 79, reset), Five(Now, 81, reset)] };
         var history = new UsageHistory(file);
 
-        Assert.Equal("Limite de 5 horas a 81%", Assert.Single(history.PendingAlerts(cfg)).Title);
+        var at81 = Assert.Single(history.PendingAlerts(cfg));
+        Assert.Equal("Limite de 5 horas a 81%", at81.Title);
+        // Its notice: under the limit's name, with the 5-hour bar, yellow.
+        Assert.Equal(("Limite de 5 horas", "Já usaste 81%", true, NoticeTone.Warn), (at81.Kind, at81.Subject, at81.FiveHour, at81.Tone));
         Assert.Empty(history.PendingAlerts(cfg));
 
         file.Samples.Add(Five(Now + 1, 96, reset));
-        Assert.Equal("Limite de 5 horas a 96%", Assert.Single(history.PendingAlerts(cfg)).Title);
+        var at96 = Assert.Single(history.PendingAlerts(cfg));
+        Assert.Equal("Limite de 5 horas a 96%", at96.Title);
+        Assert.Equal(NoticeTone.Crit, at96.Tone);
         Assert.Empty(history.PendingAlerts(cfg));
     }
 
@@ -151,7 +156,9 @@ public class ForecastTests
         Assert.Empty(guess.PendingAlerts(cfg));
 
         var history = new UsageHistory(new HistoryFile { Samples = [Five(Now - 1800, 10, reset), Five(Now, 30, reset)] });
-        Assert.Equal("Limite de 5 horas: ritmo alto", Assert.Single(history.PendingAlerts(cfg)).Title);
+        var pace = Assert.Single(history.PendingAlerts(cfg));
+        Assert.Equal("Limite de 5 horas: ritmo alto", pace.Title);
+        Assert.Equal(("Ritmo alto", NoticeTone.Warn), (pace.Subject, pace.Tone));
         Assert.Empty(history.PendingAlerts(cfg));
     }
 

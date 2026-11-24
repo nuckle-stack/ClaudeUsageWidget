@@ -98,6 +98,16 @@ public class WeekTests
     }
 
     [Fact]
+    public void Its_notice_leads_with_the_use_and_tells_the_rest_after()
+    {
+        var week = WeekReport.Build(AWeek, Reset, Use(("ClaudeUsageWidget", 70), ("PadelManager", 30)), Unix(Local(24, 20)))!;
+        Assert.Equal("Usaste 45% do limite semanal", WeekReport.Headline(week));
+        Assert.Equal("Na anterior, 62%. Dia mais pesado: quarta (18%). Mais usado: ClaudeUsageWidget (70%).",
+            WeekReport.NoticeText(week, new WeekSummary { Used = 62 }));
+        Assert.Equal("", WeekReport.NoticeText(new WeekSummary { Used = 0.4 }, null));
+    }
+
+    [Fact]
     public void A_quiet_week_says_little()
     {
         var week = new WeekSummary { Used = 0.4, Days = [new(Local(18, 0), 0.4)] };

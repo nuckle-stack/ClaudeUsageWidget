@@ -53,9 +53,17 @@ USAR
     Definições trocas o número por um simples ponto colorido). No início, o
     Windows mete o ícone dentro do "^": arrasta-o de lá para a barra.
   - Depois de "Sair", volta a abri-lo no menu Iniciar: "Claude Usage Widget".
-  - Avisos: "terminou" avisa uma vez; "precisa de ti" relembra até 3 vezes.
-    Se já estás a olhar para a janela da sessão, o aviso conta como visto.
-    Clicar no aviso (enquanto está no ecrã) leva-te à sessão.
+  - Avisos: aparecem por cima do widget, com o aspeto dele. A cor diz o tipo:
+    verde (terminou), laranja (precisa de ti), amarelo (a ver), vermelho
+    (limite quase gasto), azul (novidades). Clicar num aviso faz o que ele
+    sugere (ir para a sessão, abrir o resumo da semana...); o "x" só o fecha.
+    Enquanto estás longe do PC, os avisos esperam por ti, e só começam a
+    desaparecer quando voltas. Não aparecem com o "Não incomodar" do Windows,
+    numa apresentação ou com um programa em ecrã inteiro (o widget continua
+    a piscar). Ao contrário das notificações do Windows, não ficam guardados
+    na central de notificações.
+  - "terminou" avisa uma vez; "precisa de ti" relembra até 3 vezes. Se já
+    estás a olhar para a janela da sessão, o aviso conta como visto e sai.
   - "Tarefa sem avançar": uma sessão está a trabalhar há 15 minutos sem nada
     de novo na conversa, por exemplo uma ferramenta que não responde. Avisa
     uma vez. O tempo muda-se nas Definições. Um comando normal não chega a

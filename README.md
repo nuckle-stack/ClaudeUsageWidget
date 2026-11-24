@@ -103,6 +103,10 @@ Cobrem:
 - a vigia do formato dos ficheiros do Claude Code (cada sinal, a espera de 5
   minutos, o aviso uma vez por versão), a parte do dia do limite semanal e o
   resumo de cada semana;
+- os avisos do widget: um por sessão (o mais recente toma o lugar do
+  anterior), no máximo 4 no ecrã, o tempo só conta contigo ao PC, as partes
+  de cada cartão, os estados do Windows que os calam, e o que cada aviso de
+  uso diz no cartão;
 - o aviso de que sobra muito da semana e a lista das semanas, com resets em
   dias e horas diferentes: cada conta tem o seu, e pode mudar de uma semana
   para a outra;

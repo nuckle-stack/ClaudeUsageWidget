@@ -21,9 +21,12 @@ public class LeftoverTests
     public void The_day_before_a_Tuesday_evening_reset_it_says_what_is_left_once()
     {
         var history = At(Local(23, 10), 37, Local(24, 18));
-        var (title, text) = history.PendingLeftoverAlert(Local(23, 10), Weekdays)!.Value;
+        var alert = history.PendingLeftoverAlert(Local(23, 10), Weekdays)!.Value;
+        var (title, text) = alert;
         Assert.Equal("Ainda tens 63% do limite semanal", title);
         Assert.Equal("Renova amanhã às 18:00 e o que sobrar não passa para a semana seguinte.", text);
+        // Its notice: news, not trouble, with the week's bar.
+        Assert.Equal(("Limite semanal", "Ainda tens 63% por usar", NoticeTone.Info, (bool?)false), (alert.Kind, alert.Subject, alert.Tone, alert.FiveHour));
         Assert.Null(history.PendingLeftoverAlert(Local(23, 15), Weekdays));
         Assert.Null(history.PendingLeftoverAlert(Local(24, 9), Weekdays));
     }

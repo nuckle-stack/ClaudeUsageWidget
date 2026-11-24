@@ -45,8 +45,6 @@ public partial class MainWindow : Window
     private AlertKind? _pulsing;
     private SessionsWindow? _sessions;
     private DateTime _sessionsClosed;
-    /// <summary>What a click on the notification on screen does; replaced by each new one.</summary>
-    private Action? _onNotificationClick;
 
     public MainWindow()
     {
@@ -167,19 +165,19 @@ public partial class MainWindow : Window
         {
             if (await _updater.CheckAsync() is not { } update)
             {
-                if (manual) Notify("Claude Usage", $"Tens a versão mais recente ({Updater.Current.ToString(3)}).", Forms.ToolTipIcon.Info, 4000, null);
+                if (manual) Notify(new(NoticeTone.Done, "Versões", "Tens a versão mais recente", $"Claude Usage {Updater.Current.ToString(3)}.", Key: "update"), null);
                 return;
             }
             if (!manual && !_updater.ShouldAnnounce(update)) return;
             Log.Write($"Versão nova no GitHub: {update.Version.ToString(3)}.");
-            Notify("Versão nova do Claude Usage",
-                $"A {update.Version.ToString(3)} está disponível (tens a {Updater.Current.ToString(3)}). Clica aqui para a instalar.",
-                Forms.ToolTipIcon.Info, 8000, () => InstallUpdate(update));
+            Notify(new(NoticeTone.Info, "Versão nova", $"Claude Usage {update.Version.ToString(3)}",
+                    $"Tens a {Updater.Current.ToString(3)}. Instala-se em poucos segundos e as definições ficam.", Action: "Instalar", Key: "update"),
+                () => InstallUpdate(update));
         }
         catch (Exception ex)
         {
             Log.Write($"Procura de versão nova falhou: {ex.Message}");
-            if (manual) Notify("Claude Usage", "Não deu para ver se há versão nova. Ver widget.log.", Forms.ToolTipIcon.Warning, 4000, null);
+            if (manual) Notify(new(NoticeTone.Warn, "Versões", "Não deu para ver se há versão nova", "Ver widget.log.", Key: "update"), null);
         }
     }
 
@@ -204,7 +202,7 @@ public partial class MainWindow : Window
         _updating = true;
         try
         {
-            Notify("Claude Usage", $"A descarregar a versão {version} ({update.Size / 1048576.0:0} MB)…", Forms.ToolTipIcon.Info, 4000, null);
+            Notify(new(NoticeTone.Info, "Atualização", $"A descarregar a versão {version}", $"{update.Size / 1048576.0:0} MB…", Key: "update"), null);
             var folder = await _updater.DownloadAsync(update);
             Updater.RunInstaller(folder, SettingsWindow.IsAutoStart());
             Log.Write($"Atualização para {version}: instalador iniciado (registo em update.log).");
@@ -214,7 +212,7 @@ public partial class MainWindow : Window
         {
             _updating = false;
             Log.Write($"Atualização para {version} falhou: {ex}");
-            Notify("Não deu para atualizar", $"{ex.Message} Ver widget.log.", Forms.ToolTipIcon.Warning, 6000, null);
+            Notify(new(NoticeTone.Crit, "Atualização", "Não deu para atualizar", $"{ex.Message} Ver widget.log.", Key: "update"), null);
         }
     }
 
@@ -224,7 +222,8 @@ public partial class MainWindow : Window
         if (_updater.JustUpdatedFrom() is not { } from) return;
         var now = Updater.Current.ToString(3);
         Log.Write($"Atualizado de {from} para {now}.");
-        Notify("Claude Usage atualizado", $"Estás agora na versão {now}. Clica para ver as novidades.", Forms.ToolTipIcon.Info, 6000,
+        Notify(new(NoticeTone.Done, "Atualização", $"Estás na versão {now}", "Do Claude Usage, com as definições de antes.",
+                Action: "Ver novidades", Key: "update"),
             () => OpenUrl($"https://github.com/{Updater.Repo}/releases/tag/v{now}"));
     }
 
@@ -265,14 +264,13 @@ public partial class MainWindow : Window
     private void CheckLimitState()
     {
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var alerts = _history.PendingRenewals(now).Select(a => (a.Title, a.Text, Forms.ToolTipIcon.Info)).ToList();
-        if (_overage.Check(_hello.Ping, now) is { } extra) alerts.Add((extra.Title, extra.Text, Forms.ToolTipIcon.Warning));
-        foreach (var (title, text, icon) in alerts)
+        var alerts = _history.PendingRenewals(now);
+        if (_overage.Check(_hello.Ping, now) is { } extra) alerts.Add(extra);
+        foreach (var a in alerts)
         {
-            Log.Write($"Aviso de limite{(Quiet ? " [silenciado]" : "")}: {title} — {text}");
+            Log.Write($"Aviso de limite{(Quiet ? " [silenciado]" : "")}: {a.Title} — {a.Text}");
             if (Quiet) continue;
-            Notify(title, text, icon, 8000, OpenSessions);
-            if (_cfg.Alerts.Sound) System.Media.SystemSounds.Exclamation.Play();
+            Notify(NoticeOf(a), OpenSessions, System.Media.SystemSounds.Exclamation);
         }
         CloseWeek(now);
     }
@@ -297,10 +295,12 @@ public partial class MainWindow : Window
             // The use by project comes from the transcripts: read what is new first.
             await UsageLedger.Shared.RefreshAsync(TimeSpan.FromMinutes(1));
             if (_weeks.Close(_history.Samples.ToList(), UsageLedger.Shared.Summarize, now, _usageWeek) is not { } week) return;
-            var text = WeekReport.Message(week, _weeks.Before(week.ResetAt));
-            Log.Write($"Semana fechada{(Quiet ? " [silenciado]" : "")}: {text}");
+            var previous = _weeks.Before(week.ResetAt);
+            Log.Write($"Semana fechada{(Quiet ? " [silenciado]" : "")}: {WeekReport.Message(week, previous)}");
             if (Quiet) return;
-            Notify("Resumo da semana", text, Forms.ToolTipIcon.Info, 10000, () => OpenWeek(showLast: true));
+            Notify(new(NoticeTone.Info, "Resumo da semana", WeekReport.Headline(week), WeekReport.NoticeText(week, previous),
+                    Bar: new NoticeBar("7d", week.Used, WeekReport.Pct(week.Used), "", ToneOf(week.Used)), Action: "Ver resumo", Key: "week"),
+                () => OpenWeek(showLast: true));
         }
         catch (Exception ex) { Log.Write($"Falha no resumo da semana: {ex.Message}"); }
         finally { _closingWeek = false; }
@@ -415,24 +415,19 @@ public partial class MainWindow : Window
         if (!_history.Add(Current())) return;
         var alerts = _history.PendingAlerts(_cfg.UsageAlerts);
         if (_history.PendingBudgetAlert(DateTime.Now, _cfg.UsageAlerts) is { } budget) alerts.Add(budget);
-        foreach (var (title, text) in alerts)
+        foreach (var a in alerts)
         {
-            Log.Write($"Aviso de uso{(Quiet ? " [silenciado]" : "")}: {title} — {text}");
+            Log.Write($"Aviso de uso{(Quiet ? " [silenciado]" : "")}: {a.Title} — {a.Text}");
             if (Quiet) continue;
-            Notify(title, text, Forms.ToolTipIcon.Warning, 8000, OpenSessions);
-            if (_cfg.Alerts.Sound) System.Media.SystemSounds.Exclamation.Play();
+            Notify(NoticeOf(a), OpenSessions, System.Media.SystemSounds.Exclamation);
         }
 
-        // Not a warning: a chance. A notification replaces the one on screen, so
-        // it waits for a reading with no warning to give. A click shows what the
-        // week went on so far.
-        if (alerts.Count > 0) return;
-        if (_history.PendingLeftoverAlert(DateTime.Now, _cfg.UsageAlerts) is var (leftTitle, leftText))
+        // Not a warning: a chance. A click shows what the week went on so far.
+        if (_history.PendingLeftoverAlert(DateTime.Now, _cfg.UsageAlerts) is { } left)
         {
-            Log.Write($"Aviso de uso{(Quiet ? " [silenciado]" : "")}: {leftTitle} — {leftText}");
+            Log.Write($"Aviso de uso{(Quiet ? " [silenciado]" : "")}: {left.Title} — {left.Text}");
             if (Quiet) return;
-            Notify(leftTitle, leftText, Forms.ToolTipIcon.Info, 10000, () => OpenWeek(showLast: false));
-            if (_cfg.Alerts.Sound) System.Media.SystemSounds.Asterisk.Play();
+            Notify(NoticeOf(left, "Ver semana"), () => OpenWeek(showLast: false), System.Media.SystemSounds.Asterisk);
         }
     }
 
@@ -486,7 +481,8 @@ public partial class MainWindow : Window
             Log.Write($"Formato do Claude Code {_claudeVersion}{(Quiet ? " [silenciado]" : "")}: {string.Join(", ", announce.Select(p => p.Key))} — {text}");
             if (Quiet) return;
             // A click looks for a widget that understands the new format.
-            Notify("O widget deixou de perceber o Claude Code", text, Forms.ToolTipIcon.Warning, 10000, UpdateFromMenu);
+            Notify(new(NoticeTone.Warn, "Claude Code", "O widget deixou de perceber o Claude Code", text,
+                Action: "Procurar versão nova", Key: "format"), UpdateFromMenu);
         }
         catch (Exception ex) { Log.Write($"Falha a verificar o formato do Claude Code: {ex.Message}"); }
     }
@@ -509,23 +505,28 @@ public partial class MainWindow : Window
                 foreach (var alert in _alerts.Update(_cfg.Alerts, sessions))
                     Announce(alert, sessions.FirstOrDefault(s => s.SessionId == alert.SessionId));
                 foreach (var (title, text, session) in _stalls.Update(_cfg.Alerts, sessions, DateTimeOffset.UtcNow.ToUnixTimeSeconds()))
-                    AnnounceAbout(session, "Aviso (sem avançar)", title, text);
+                    AnnounceAbout(session, "Aviso (sem avançar)", "stall", title, text);
             }
             if (_cfg.ContextAlerts.Enabled)
                 foreach (var (title, text, session) in _context.Update(_cfg.ContextAlerts, sessions))
-                    AnnounceAbout(session, "Aviso de contexto", title, text);
+                    AnnounceAbout(session, "Aviso de contexto", "context", title, text);
+            // A session you went to yourself, or that moved on, no longer needs its notice.
+            _notices?.Prune(key => key.StartsWith("session:", StringComparison.Ordinal) &&
+                                   _alerts.For(key["session:".Length..]) is null or { Acked: true });
         }
         catch (Exception ex) { Log.Write($"Falha nos avisos: {ex.Message}"); }
         UpdatePulse();
     }
 
-    /// <summary>A warning about one session, said once; a click goes to it.</summary>
-    private void AnnounceAbout(SessionInfo session, string kind, string title, string text)
+    /// <summary>A warning about one session ("name\nwhat"), said once; a click goes to it.</summary>
+    private void AnnounceAbout(SessionInfo session, string kind, string key, string title, string text)
     {
         Log.Write($"{kind}{(Quiet ? " [silenciado]" : "")}: {title} — {text.Replace("\n", " — ")}");
         if (Quiet) return;
-        Notify(title, text, Forms.ToolTipIcon.Warning, 8000, () => GoTo(session.Pid, session.Name, session.SessionId));
-        if (_cfg.Alerts.Sound) System.Media.SystemSounds.Exclamation.Play();
+        var lines = text.Split('\n', 2);
+        Notify(new(NoticeTone.Warn, title, lines[0], lines.Length > 1 ? lines[1] : "", session.Kind,
+                Action: "Ir para a sessão", Key: $"{key}:{session.SessionId}"),
+            () => GoTo(session.Pid, session.Name, session.SessionId), System.Media.SystemSounds.Exclamation);
     }
 
     private void Announce(Alert a, SessionInfo? session)
@@ -534,22 +535,54 @@ public partial class MainWindow : Window
         var text = SessionStatus.AlertText(a, session);
         Log.Write($"Aviso ({(input ? "precisa de ti" : "terminou")}){(Quiet ? " [silenciado]" : "")}: {a.Name} — {text}");
         if (Quiet) return;
-        Notify(input ? "Claude precisa de ti" : "Claude terminou",
-            $"{a.Name}\n{text}",
-            input ? Forms.ToolTipIcon.Warning : Forms.ToolTipIcon.Info, 6000,
-            () => GoTo(a.Pid, a.Name, a.SessionId));
-        if (_cfg.Alerts.Sound)
-            (input ? System.Media.SystemSounds.Exclamation : System.Media.SystemSounds.Asterisk).Play();
+        // One notice per session: what it needs now takes the place of what it needed before.
+        Notify(new(input ? NoticeTone.Input : NoticeTone.Done, input ? "Precisa de ti" : "Terminou", a.Name, text,
+                session?.Kind ?? "", Action: input ? "Ir para a sessão" : "", Key: $"session:{a.SessionId}"),
+            () => GoTo(a.Pid, a.Name, a.SessionId),
+            input ? System.Media.SystemSounds.Exclamation : System.Media.SystemSounds.Asterisk);
     }
 
-    /// <summary>Shows a notification; a click on it while it is on screen runs onClick.</summary>
-    private void Notify(string title, string text, Forms.ToolTipIcon icon, int ms, Action? onClick)
+    private NoticeWindow? _notices;
+
+    /// <summary>
+    /// Shows a notice above the widget, with its sound when sounds are on;
+    /// nothing while Windows wants quiet (do not disturb, a full-screen app,
+    /// a presentation), as with its own notifications.
+    /// </summary>
+    private void Notify(Notice notice, Action? onClick, System.Media.SystemSound? sound = null)
     {
-        // Notifications don't say which one was clicked, so keep only the
-        // latest's action: it is the one on screen.
-        _onNotificationClick = onClick;
-        _tray.ShowBalloonTip(ms, title, text, icon);
+        if (WindowsQuiet.Reason() is { } why)
+        {
+            Log.Write($"Aviso não mostrado: o Windows está em \"{why}\".");
+            return;
+        }
+        _notices ??= new NoticeWindow(this);
+        _notices.Add(notice, onClick, NoticeQueue.Life(notice.Tone));
+        if (sound is not null && _cfg.Alerts.Sound) sound.Play();
     }
+
+    /// <summary>The widget's bar for one limit, as it is now; null without a running window.</summary>
+    private NoticeBar? BarFor(bool? fiveHour)
+    {
+        if (fiveHour is not { } five) return null;
+        var w = five ? Current().FiveHour : Current().SevenDay;
+        if (w?.ResetsAt is not long resetsAt) return null;
+        var left = DateTimeOffset.FromUnixTimeSeconds(resetsAt) - DateTimeOffset.UtcNow;
+        if (left <= TimeSpan.Zero) return null;
+        var p = Percent(w);
+        return new NoticeBar(five ? "5h" : "7d", p, $"{p}%", FormatLeft(left), ToneOf(p));
+    }
+
+    private NoticeTone ToneOf(double p) => LevelOf((int)Math.Round(p)) switch
+    {
+        "crit" => NoticeTone.Crit,
+        "warn" => NoticeTone.Warn,
+        _ => NoticeTone.Done,
+    };
+
+    /// <summary>A usage alert's notice, with its limit's bar; one per limit on screen.</summary>
+    private Notice NoticeOf(UsageAlert a, string action = "") =>
+        new(a.Tone, a.Kind, a.Subject, a.Text, Bar: BarFor(a.FiveHour), Action: action, Key: "limit:" + a.Kind);
 
     /// <summary>Brings a session's window to the front, and counts its alert as seen.</summary>
     private void GoTo(int pid, string name, string sessionId)
@@ -648,8 +681,8 @@ public partial class MainWindow : Window
         {
             _hotkeyState = $"{name} (ocupado por outro programa)";
             Log.Write($"Atalho {name} já está a ser usado por outro programa.");
-            Notify("Claude Usage", $"O atalho {name} já está a ser usado por outro programa. Escolhe outro nas Definições.",
-                Forms.ToolTipIcon.Warning, 6000, OpenSettings);
+            Notify(new(NoticeTone.Warn, "Atalho", $"{name} já está a ser usado", "Outro programa ficou com ele. Escolhe outro nas Definições.",
+                Action: "Definições"), OpenSettings);
             return;
         }
         GoToWaitingMenu.InputGestureText = name;
@@ -939,9 +972,9 @@ public partial class MainWindow : Window
         Render();
         var ok = await task;
         Render();
-        Notify("Claude Usage",
-            ok ? "Limites atualizados." : "Atualização falhou. Ver widget.log.",
-            ok ? Forms.ToolTipIcon.Info : Forms.ToolTipIcon.Warning, 4000, null);
+        Notify(ok
+            ? new(NoticeTone.Done, "Limites", "Atualizados agora", Bar: BarFor(true), Key: "hello")
+            : new(NoticeTone.Warn, "Limites", "Não deu para os atualizar", "Ver widget.log.", Key: "hello"), null);
     }
 
     private bool _diagnosing;
@@ -971,16 +1004,15 @@ public partial class MainWindow : Window
                 catch (ExternalException) { await Task.Delay(100); }
             }
             Log.Write($"Diagnóstico gerado{(copied ? " e copiado" : "")}.");
-            Notify(copied ? "Diagnóstico copiado" : "Diagnóstico guardado",
+            Notify(new(NoticeTone.Done, "Diagnóstico", copied ? "Copiado" : "Guardado",
                 copied
                     ? "Cola-o (Ctrl+V) numa mensagem para quem te ajuda. Não leva nomes de sessões nem mensagens."
-                    : $"Não deu para copiar. Está em {Diagnostics.ReportPath}.",
-                Forms.ToolTipIcon.Info, 6000, null);
+                    : $"Não deu para copiar. Está em {Diagnostics.ReportPath}.", Key: "diagnostics"), null);
         }
         catch (Exception ex)
         {
             Log.Write($"Falha no diagnóstico: {ex}");
-            Notify("Claude Usage", "Não deu para gerar o diagnóstico. Ver widget.log.", Forms.ToolTipIcon.Warning, 4000, null);
+            Notify(new(NoticeTone.Warn, "Diagnóstico", "Não deu para o gerar", "Ver widget.log.", Key: "diagnostics"), null);
         }
         finally { _diagnosing = false; }
     }
@@ -1033,13 +1065,6 @@ public partial class MainWindow : Window
         _tray.Text = "Claude Usage";
         _tray.Visible = true;
         _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) ToggleVisible(); };
-        // Only fires while the notification is on screen, not from the notification centre later.
-        _tray.BalloonTipClicked += (_, _) =>
-        {
-            var click = _onNotificationClick;
-            _onNotificationClick = null;
-            click?.Invoke();
-        };
     }
 
     private static Color Hex(string hex) => (Color)ColorConverter.ConvertFromString(hex);
