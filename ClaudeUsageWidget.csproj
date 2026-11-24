@@ -11,7 +11,7 @@
     <RootNamespace>ClaudeUsageWidget</RootNamespace>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <!-- Raise it for each release (release.ps1 publishes it as tag v<Version>). -->
-    <Version>1.10.0</Version>
+    <Version>1.11.0</Version>
   </PropertyGroup>
 
   <!-- WinForms is only here for the tray icon; keep its types out of the
