@@ -48,11 +48,20 @@ USAR
   - Clique: abre a lista de sessões. Clicar numa sessão traz a janela dela para
     a frente. O "x" (ao passar o rato) esconde-a até voltar a ter atividade.
   - Botão direito: Definições (auto-hello, avisos, cores), Não incomodar, Sair.
-  - Também há um ícone na área de notificação, junto ao relógio.
+  - Também há um ícone junto ao relógio, com a % da janela de 5h na mesma cor
+    do widget. Assim podes esconder o widget e continuar a ver o número (nas
+    Definições trocas o número por um simples ponto colorido). No início, o
+    Windows mete o ícone dentro do "^": arrasta-o de lá para a barra.
   - Depois de "Sair", volta a abri-lo no menu Iniciar: "Claude Usage Widget".
   - Avisos: "terminou" avisa uma vez; "precisa de ti" relembra até 3 vezes.
     Se já estás a olhar para a janela da sessão, o aviso conta como visto.
     Clicar no aviso (enquanto está no ecrã) leva-te à sessão.
+  - "Tarefa sem avançar": uma sessão está a trabalhar há 15 minutos sem nada
+    de novo na conversa, por exemplo uma ferramenta que não responde. Avisa
+    uma vez. O tempo muda-se nas Definições. Um comando normal não chega a
+    tanto: o Claude Code interrompe-o ao fim de 2 a 10 minutos. O trabalho
+    entregue a um subagente fica de fora, porque o widget não o consegue
+    acompanhar.
   - "Resumo da semana" (botão direito no widget): quanto do limite semanal
     usaste, quanto gastou cada dia, que projetos o gastaram e quantas vezes a
     janela de 5h esgotou; também a semana anterior. Quando a semana renova, o

@@ -141,6 +141,12 @@ public class AlertsConfig
     public int MinTaskSeconds { get; set; } = 30;
     /// <summary>Repeat an unanswered alert this often. 0 = once only.</summary>
     public int RemindMinutes { get; set; } = 2;
+    /// <summary>
+    /// Announce a session that has been working this long with nothing new in
+    /// its conversation. Claude Code stops a command itself after 2 to 10
+    /// minutes, so this stays above 10. 0 = never.
+    /// </summary>
+    public int StallMinutes { get; set; } = 15;
 }
 
 public class ContextAlertsConfig
@@ -196,6 +202,8 @@ public class Config
     public int HideIdleDesktopMinutes { get; set; } = 30;
     public double Opacity { get; set; } = 0.9;
     public bool AlwaysOnTop { get; set; } = true;
+    /// <summary>Draw the 5-hour window's percentage in the tray icon, rather than a coloured dot.</summary>
+    public bool TrayPercent { get; set; } = true;
     public int WarnAt { get; set; } = 70;
     public int CritAt { get; set; } = 90;
     public double? Left { get; set; }

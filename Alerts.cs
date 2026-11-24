@@ -64,6 +64,59 @@ public class ContextWatch
 }
 
 /// <summary>
+/// Announces, once per stall, a session that has been working for a long
+/// time with nothing new in its conversation: a tool that never answers (an
+/// MCP server, say), or a command allowed to run past Claude Code's usual
+/// limit. Claude Code stops a command by itself after 2 minutes (10 when
+/// asked), so the default wait is longer than that. Work handed to a subagent
+/// is left out: its progress is written somewhere else, so a long one would
+/// look stuck.
+/// </summary>
+public class StallWatch
+{
+    /// <summary>Session id -> the progress stamp its stall was announced for.</summary>
+    private readonly Dictionary<string, long> _announced = new();
+
+    /// <summary>New stall alerts, each with its session (to go to it when the alert is clicked).</summary>
+    public List<(string Title, string Text, SessionInfo Session)> Update(AlertsConfig cfg, List<SessionInfo> sessions, long now)
+    {
+        var result = new List<(string, string, SessionInfo)>();
+        var live = sessions.Where(s => !s.IsSdk && s.SessionId.Length > 0).ToList();
+        foreach (var s in live)
+        {
+            if (StalledSince(s, cfg, now) is not long since)
+            {
+                _announced.Remove(s.SessionId);
+                continue;
+            }
+            // Once per stall: a new line in the conversation arms it again.
+            if (_announced.TryGetValue(s.SessionId, out var told) && told == since) continue;
+            _announced[s.SessionId] = since;
+            var what = s.Doing is { } d ? "a " + d.Phrase : "a trabalhar";
+            result.Add(("Tarefa sem avançar",
+                $"{s.Name}\nHá {Minutes(now - since)} {what}, sem nada de novo na conversa.", s));
+        }
+
+        var ids = live.Select(s => s.SessionId).ToHashSet();
+        foreach (var gone in _announced.Keys.Where(id => !ids.Contains(id)).ToList()) _announced.Remove(gone);
+        return result;
+    }
+
+    /// <summary>Since when (unix seconds) the session has been working without moving on, once that is too long; else null.</summary>
+    internal static long? StalledSince(SessionInfo s, AlertsConfig cfg, long now)
+    {
+        // Without a transcript there is nothing to tell a stall from a long answer.
+        if (cfg.StallMinutes <= 0 || !s.Working || s.ProgressAt <= 0 || s.Doing is { Delegates: true }) return null;
+        // A status change is a sign of life too.
+        var since = Math.Max(s.ProgressAt, s.StatusUpdatedAt / 1000);
+        return now - since >= cfg.StallMinutes * 60L ? since : null;
+    }
+
+    private static string Minutes(long seconds) =>
+        seconds >= 3600 ? $"{seconds / 3600}h{seconds % 3600 / 60:D2}" : $"{seconds / 60} min";
+}
+
+/// <summary>
 /// Turns session activity into alerts. "Done" comes from a session going
 /// busy -> idle after a task long enough to matter. "Input" comes from the
 /// Notification hook (events.jsonl, written by notify.ps1) or from a session

@@ -113,7 +113,8 @@ public static class Diagnostics
               (hello.WeekdaysOnly ? ", só dias úteis" : "") + $", modelo {hello.Model}"));
         Line("Atualizar enquanto há uso: " + (cfg.RefreshMinutes > 0 ? $"a cada {cfg.RefreshMinutes} min" : "nunca"));
         Line("Avisos das sessões: " + (cfg.Alerts.Enabled
-            ? $"ligados (som {(cfg.Alerts.Sound ? "ligado" : "desligado")}, tarefas a partir de {cfg.Alerts.MinTaskSeconds} s, relembrar a cada {cfg.Alerts.RemindMinutes} min)"
+            ? $"ligados (som {(cfg.Alerts.Sound ? "ligado" : "desligado")}, tarefas a partir de {cfg.Alerts.MinTaskSeconds} s, relembrar a cada {cfg.Alerts.RemindMinutes} min, " +
+              $"sem avançar {(cfg.Alerts.StallMinutes > 0 ? $"ao fim de {cfg.Alerts.StallMinutes} min" : "desligado")})"
             : "desligados"));
         var usage = cfg.UsageAlerts;
         Line($"Avisos de uso: níveis {(usage.Levels.Length > 0 ? string.Join(", ", usage.Levels) + "%" : "nenhum")} · ritmo {YesNo(usage.Forecast)} · " +

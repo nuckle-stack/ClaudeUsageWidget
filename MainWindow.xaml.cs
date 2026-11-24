@@ -26,7 +26,7 @@ public partial class MainWindow : Window
     private readonly AutoHello _hello = new();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(5) };
     private readonly Forms.NotifyIcon _tray = new();
-    private readonly Dictionary<string, Drawing.Icon> _icons = new();
+    private readonly TrayIcon _trayIcon = new();
 
     private Config _cfg = Json.Load<Config>(Paths.Config);
     private Limits _limits = new();
@@ -40,6 +40,7 @@ public partial class MainWindow : Window
     private static readonly Color NormalBorder = Hex("#30FFFFFF");
     private readonly AlertTracker _alerts = new();
     private readonly ContextWatch _context = new();
+    private readonly StallWatch _stalls = new();
     private readonly OverageWatch _overage = new();
     private AlertKind? _pulsing;
     private SessionsWindow? _sessions;
@@ -492,19 +493,27 @@ public partial class MainWindow : Window
         {
             var sessions = await Task.Run(SessionScanner.Scan);
             if (_cfg.Alerts.Enabled)
+            {
                 foreach (var alert in _alerts.Update(_cfg.Alerts, sessions))
                     Announce(alert, sessions.FirstOrDefault(s => s.SessionId == alert.SessionId));
+                foreach (var (title, text, session) in _stalls.Update(_cfg.Alerts, sessions, DateTimeOffset.UtcNow.ToUnixTimeSeconds()))
+                    AnnounceAbout(session, "Aviso (sem avançar)", title, text);
+            }
             if (_cfg.ContextAlerts.Enabled)
                 foreach (var (title, text, session) in _context.Update(_cfg.ContextAlerts, sessions))
-                {
-                    Log.Write($"Aviso de contexto{(Quiet ? " [silenciado]" : "")}: {title} — {text.Replace("\n", " — ")}");
-                    if (Quiet) continue;
-                    Notify(title, text, Forms.ToolTipIcon.Warning, 8000, () => GoTo(session.Pid, session.Name, session.SessionId));
-                    if (_cfg.Alerts.Sound) System.Media.SystemSounds.Exclamation.Play();
-                }
+                    AnnounceAbout(session, "Aviso de contexto", title, text);
         }
         catch (Exception ex) { Log.Write($"Falha nos avisos: {ex.Message}"); }
         UpdatePulse();
+    }
+
+    /// <summary>A warning about one session, said once; a click goes to it.</summary>
+    private void AnnounceAbout(SessionInfo session, string kind, string title, string text)
+    {
+        Log.Write($"{kind}{(Quiet ? " [silenciado]" : "")}: {title} — {text.Replace("\n", " — ")}");
+        if (Quiet) return;
+        Notify(title, text, Forms.ToolTipIcon.Warning, 8000, () => GoTo(session.Pid, session.Name, session.SessionId));
+        if (_cfg.Alerts.Sound) System.Media.SystemSounds.Exclamation.Play();
     }
 
     private void Announce(Alert a, SessionInfo? session)
@@ -734,7 +743,11 @@ public partial class MainWindow : Window
             tip += age.TotalMinutes < 1 ? "\nAtualizado agora" : $"\nAtualizado há {FormatLeft(age)}";
         }
         _tray.Text = tip.Length > 127 ? tip[..127] : tip;
-        _tray.Icon = IconFor(LevelOf(Percent(cur.FiveHour)));
+        // The number the bar shows: none without a reading, 0 once the window renewed.
+        int? shown = cur.FiveHour?.ResetsAt is long resets
+            ? (resets <= DateTimeOffset.UtcNow.ToUnixTimeSeconds() ? 0 : Percent(cur.FiveHour))
+            : null;
+        _trayIcon.Show(_tray, _cfg.TrayPercent ? shown : null, LevelOf(shown ?? 0));
         Root.ToolTip = tip + (_cfg.AutoHello.Enabled ? "\nAuto-hello: ligado" : "\nAuto-hello: desligado");
     }
 
@@ -1004,7 +1017,7 @@ public partial class MainWindow : Window
         menu.Items.Add("Sair", null, (_, _) => Exit());
 
         _tray.ContextMenuStrip = menu;
-        _tray.Icon = IconFor("ok");
+        _trayIcon.Show(_tray, null, "ok");
         _tray.Text = "Claude Usage";
         _tray.Visible = true;
         _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) ToggleVisible(); };
@@ -1015,32 +1028,6 @@ public partial class MainWindow : Window
             _onNotificationClick = null;
             click?.Invoke();
         };
-    }
-
-    private Drawing.Icon IconFor(string level)
-    {
-        if (_icons.TryGetValue(level, out var icon)) return icon;
-
-        var color = level switch
-        {
-            "crit" => Drawing.Color.FromArgb(248, 113, 113),
-            "warn" => Drawing.Color.FromArgb(250, 204, 21),
-            _ => Drawing.Color.FromArgb(74, 222, 128),
-        };
-        using var bmp = new Drawing.Bitmap(32, 32);
-        using (var g = Drawing.Graphics.FromImage(bmp))
-        {
-            g.SmoothingMode = Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            g.Clear(Drawing.Color.Transparent);
-            using var back = new Drawing.SolidBrush(Drawing.Color.FromArgb(21, 21, 26));
-            using var fore = new Drawing.SolidBrush(color);
-            g.FillEllipse(back, 1, 1, 30, 30);
-            g.FillEllipse(fore, 8, 8, 16, 16);
-        }
-        // Cached for the life of the process, so the handle is never released.
-        icon = Drawing.Icon.FromHandle(bmp.GetHicon());
-        _icons[level] = icon;
-        return icon;
     }
 
     private static Color Hex(string hex) => (Color)ColorConverter.ConvertFromString(hex);

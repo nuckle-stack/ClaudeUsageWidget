@@ -32,6 +32,12 @@ public class SessionInfo
     /// <summary>The tool call it is waiting on, if any: what it is doing now, or what it needs you for.</summary>
     public Doing? Doing { get; init; }
 
+    /// <summary>
+    /// When its conversation last moved on (unix seconds): the newest
+    /// timestamped line in the transcript. 0 when there is no transcript to read.
+    /// </summary>
+    public long ProgressAt { get; init; }
+
     public bool IsSdk => Kind == "SDK";
 
     /// <summary>
@@ -117,6 +123,7 @@ public static class SessionScanner
                     ContextTokens = ctx?.Tokens ?? 0,
                     ContextSize = ctx?.Size ?? 0,
                     Doing = Transcripts.Activity(claudeDir, sessionId, cwd),
+                    ProgressAt = Transcripts.ProgressAt(claudeDir, sessionId, cwd),
                 });
             }
             catch { }
@@ -217,6 +224,8 @@ public static class Transcripts
         public long Tokens;
         public string Model = "";
         public long AnsweredAt;
+        /// <summary>The newest timestamp on any line read, unix seconds.</summary>
+        public long LastLineAt;
         /// <summary>Tool calls with no result yet, by call id.</summary>
         public readonly Dictionary<string, Doing> Pending = new();
     }
@@ -230,6 +239,17 @@ public static class Transcripts
             var e = Refresh(claudeDir, sessionId, cwd);
             return e.Pending.Values.MaxBy(d => d.Since);
         }
+    }
+
+    /// <summary>
+    /// When the conversation last moved on (unix seconds), 0 without a
+    /// transcript. Only timestamped lines count: an idle session keeps
+    /// appending bookkeeping lines (title, mode...), which carry no time.
+    /// </summary>
+    public static long ProgressAt(string claudeDir, string sessionId, string cwd)
+    {
+        if (sessionId.Length == 0) return 0;
+        lock (Cache) return Refresh(claudeDir, sessionId, cwd).LastLineAt;
     }
 
     private static readonly Dictionary<string, Entry> Cache = new();
@@ -306,8 +326,10 @@ public static class Transcripts
         e.Offset += end + 1;
 
         var text = System.Text.Encoding.UTF8.GetString(buffer, 0, end);
+        var latest = DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds();
         foreach (var line in text.Split('\n'))
         {
+            Stamp(line, e, latest);
             if (e.Pending.Count > 0 && line.Contains("\"tool_result\"")) Resolve(line, e);
             if (line.Contains("\"usage\"") && line.Contains("\"assistant\""))
             {
@@ -371,6 +393,27 @@ public static class Transcripts
             el.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
         static long Count(JsonElement el, string name) =>
             el.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var n) ? n : 0;
+    }
+
+    /// <summary>
+    /// Moves LastLineAt to the newest "timestamp" on the line. A key inside a
+    /// tool's text is escaped (\"timestamp\") and does not match; one inside a
+    /// tool's input does, so a time in the future (a date that input was
+    /// about) is not taken as progress.
+    /// </summary>
+    private static void Stamp(string line, Entry e, long latest)
+    {
+        const string key = "\"timestamp\":\"";
+        for (var i = line.IndexOf(key, StringComparison.Ordinal); i >= 0; i = line.IndexOf(key, i + key.Length, StringComparison.Ordinal))
+        {
+            var start = i + key.Length;
+            var end = line.IndexOf('"', start);
+            if (end <= start || end - start > 40) continue;
+            if (DateTimeOffset.TryParse(line.AsSpan(start, end - start), System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal, out var at) &&
+                at.ToUnixTimeSeconds() is var s && s <= latest && s > e.LastLineAt)
+                e.LastLineAt = s;
+        }
     }
 
     /// <summary>

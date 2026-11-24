@@ -163,6 +163,64 @@ public class ActivityTests
         Assert.Equal("editar Forecast.cs", Activity(id)!.Phrase);
     }
 
+    [Fact]
+    public void Each_call_knows_its_tool_and_whether_it_hands_work_to_a_subagent()
+    {
+        var agent = Describe("Agent", """{"description":"Find the session readers"}""");
+        Assert.Equal("Agent", agent.Tool);
+        Assert.True(agent.Delegates);
+        Assert.True(Describe("Task", "{}").Delegates);
+        Assert.False(Describe("Bash", """{"command":"git push"}""").Delegates);
+        Assert.Equal("AskUserQuestion", Describe("AskUserQuestion", """{"questions":[]}""").Tool);
+    }
+
+    // ---- when the conversation last moved on -------------------------------------------
+
+    private long ProgressAt(string id) => Transcripts.ProgressAt(_claudeDir, id, Cwd);
+
+    [Fact]
+    public void Progress_is_the_newest_timestamped_line()
+    {
+        var id = Guid.NewGuid().ToString();
+        var path = Transcript(id);
+        File.WriteAllText(path, Thinking(Now - 300) + Call("toolu_1", "Bash", RunTests, Now - 200));
+        Assert.Equal(Now - 200, ProgressAt(id));
+
+        // An idle session's bookkeeping carries no time and is not progress.
+        File.AppendAllText(path, """{"type":"last-prompt","lastPrompt":"x","sessionId":"s"}""" + "\n" +
+                                 """{"type":"ai-title","aiTitle":"Projeto","sessionId":"s"}""" + "\n");
+        Assert.Equal(Now - 200, ProgressAt(id));
+
+        File.AppendAllText(path, Thinking(Now - 10));
+        Assert.Equal(Now - 10, ProgressAt(id));
+    }
+
+    [Fact]
+    public void Times_inside_a_tool_s_input_or_output_are_not_progress()
+    {
+        var id = Guid.NewGuid().ToString();
+        // A date in the future, in a tool's input (a reminder, say)...
+        var future = DateTimeOffset.FromUnixTimeSeconds(Now + 86400).ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+        var input = new Dictionary<string, string> { ["timestamp"] = future, ["command"] = "echo" };
+        // ...and one quoted in a tool's output, where the quotes are escaped.
+        var output = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["type"] = "user",
+            ["message"] = new Dictionary<string, object>
+            {
+                ["content"] = new[] { new Dictionary<string, object> { ["tool_use_id"] = "toolu_0", ["type"] = "tool_result", ["content"] = $"{{\"timestamp\":\"{future}\"}}" } },
+            },
+        }) + "\n";
+        File.WriteAllText(Transcript(id), Call("toolu_1", "Bash", input, Now - 100) + output);
+        Assert.Equal(Now - 100, ProgressAt(id));
+    }
+
+    [Fact]
+    public void Without_a_transcript_progress_is_unknown()
+    {
+        Assert.Equal(0, ProgressAt(Guid.NewGuid().ToString()));
+    }
+
     // ---- the line in the sessions list -------------------------------------------------
 
     private static readonly DateTimeOffset At = DateTimeOffset.FromUnixTimeSeconds(Now);

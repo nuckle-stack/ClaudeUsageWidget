@@ -53,6 +53,12 @@
             <TextBlock Text="min (0 = só uma vez)" VerticalAlignment="Center"/>
         </StackPanel>
         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock Text="Avisar se uma tarefa não avançar em" VerticalAlignment="Center"/>
+            <TextBox x:Name="StallMinutes" Width="36" Margin="8,0" TextAlignment="Center"
+                     ToolTip="Uma vez, quando uma sessão está a trabalhar mas a conversa não tem nada de novo há este tempo: uma ferramenta que não responde, por exemplo. O Claude Code já interrompe os comandos ao fim de 2 a 10 minutos, por isso convém mais de 10. 0 = nunca."/>
+            <TextBlock Text="min" VerticalAlignment="Center"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
             <TextBlock Text="Atalho para a sessão à tua espera" VerticalAlignment="Center"/>
             <TextBox x:Name="HotkeyBox" Width="90" Margin="8,0" TextAlignment="Center"
                      ToolTip="Em qualquer programa, salta para a sessão que espera há mais tempo; outra vez, para a seguinte. Ex. Ctrl+Alt+C. Vazio = sem atalho."/>
@@ -96,6 +102,7 @@
         <Separator Margin="0,16,0,12"/>
         <TextBlock Text="Janela" FontWeight="SemiBold" FontSize="13"/>
         <CheckBox x:Name="OnTop" Margin="0,8,0,0" Content="Sempre por cima"/>
+        <CheckBox x:Name="TrayPercent" Margin="0,8,0,0" Content="Mostrar a % da janela de 5h no ícone junto ao relógio"/>
         <CheckBox x:Name="AutoStart" Margin="0,8,0,0" Content="Iniciar com o Windows"/>
         <CheckBox x:Name="CheckUpdates" Margin="0,8,0,0" Content="Procurar versões novas no GitHub e oferecer a instalação"/>
         <StackPanel Orientation="Horizontal" Margin="0,10,0,0">

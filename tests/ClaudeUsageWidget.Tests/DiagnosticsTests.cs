@@ -45,6 +45,8 @@ public class DiagnosticsTests
     [Theory]
     [InlineData("2026-11-20 01:32:30 Aviso (precisa de ti): Estado do projeto — Claude needs your permission to use Bash",
                 "2026-11-20 01:32:30 Aviso (precisa de ti): …")]
+    [InlineData("2026-11-24 10:15:00 Aviso (sem avançar): Tarefa sem avançar — Estado do projeto — Há 15 min a correr git push, sem nada de novo na conversa.",
+                "2026-11-24 10:15:00 Aviso (sem avançar): …")]
     [InlineData("2026-11-20 01:32:30 Aviso (terminou) [silenciado]: Projeto X — Done",
                 "2026-11-20 01:32:30 Aviso (terminou) [silenciado]: …")]
     [InlineData("2026-11-20 01:32:30 Aviso de contexto: Contexto quase cheio — Projeto X — 85%",

@@ -10,10 +10,14 @@ namespace ClaudeUsageWidget;
 /// "a editar Forecast.cs" while it runs and "precisa de ti para editar
 /// Forecast.cs" when it waits for permission. Question is set for the calls
 /// that are themselves a question to you (a question, a plan to approve).
+/// Tool is the tool's name as Claude Code calls it ("Bash", "Agent"...).
 /// </summary>
-public record Doing(string Phrase, string? Question, long Since)
+public record Doing(string Phrase, string? Question, long Since, string Tool = "")
 {
     public bool WaitsForYou => Question is not null;
+
+    /// <summary>Work handed to a subagent, whose progress is not written in the session's own conversation.</summary>
+    public bool Delegates => Tool is "Task" or "Agent";
 }
 
 /// <summary>How a session's line in the list reads.</summary>
@@ -100,7 +104,7 @@ public static class ToolActivity
         string S(string name) =>
             input.ValueKind == JsonValueKind.Object && input.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String
                 ? v.GetString() ?? "" : "";
-        Doing Say(string phrase) => new(phrase, null, since);
+        Doing Say(string phrase) => new(phrase, null, since, tool);
 
         switch (tool)
         {
@@ -122,8 +126,8 @@ public static class ToolActivity
             case "TodoWrite": return Say("atualizar a lista de tarefas");
             case "Skill": return Say(S("skill") is { Length: > 0 } skill ? $"usar a skill {skill}" : "usar uma skill");
             case "ToolSearch": return Say("carregar ferramentas");
-            case "AskUserQuestion": return new("responder a uma pergunta", "Tem uma pergunta para ti.", since);
-            case "ExitPlanMode": return new("aprovar o plano", "Quer que aproves o plano.", since);
+            case "AskUserQuestion": return new("responder a uma pergunta", "Tem uma pergunta para ti.", since, tool);
+            case "ExitPlanMode": return new("aprovar o plano", "Quer que aproves o plano.", since, tool);
         }
         // mcp__<server>__<tool>
         var parts = tool.Split("__");

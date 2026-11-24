@@ -35,6 +35,8 @@ public partial class SettingsWindow : Window
         AlertsSound.IsChecked = cfg.Alerts.Sound;
         MinTask.Text = cfg.Alerts.MinTaskSeconds.ToString();
         Remind.Text = cfg.Alerts.RemindMinutes.ToString();
+        StallMinutes.Text = cfg.Alerts.StallMinutes.ToString();
+        TrayPercent.IsChecked = cfg.TrayPercent;
         HotkeyBox.Text = cfg.Hotkey;
         Levels.Text = string.Join(", ", cfg.UsageAlerts.Levels);
         ForecastAlert.IsChecked = cfg.UsageAlerts.Forecast;
@@ -87,9 +89,10 @@ public partial class SettingsWindow : Window
         }
 
         if (!int.TryParse(MinTask.Text, out var minTask) || minTask < 0 ||
-            !int.TryParse(Remind.Text, out var remind) || remind < 0)
+            !int.TryParse(Remind.Text, out var remind) || remind < 0 ||
+            !int.TryParse(StallMinutes.Text, out var stall) || stall < 0 || stall > 1440)
         {
-            Fail("Avisos: segundos e minutos têm de ser números a partir de 0.");
+            Fail("Avisos: segundos e minutos têm de ser números a partir de 0 (tarefa sem avançar: até 1440).");
             return;
         }
 
@@ -158,6 +161,7 @@ public partial class SettingsWindow : Window
                 Sound = AlertsSound.IsChecked == true,
                 MinTaskSeconds = minTask,
                 RemindMinutes = remind,
+                StallMinutes = stall,
             },
             RefreshMinutes = refresh,
             ShowSdkSessions = _original.ShowSdkSessions,
@@ -175,6 +179,7 @@ public partial class SettingsWindow : Window
             },
             Opacity = OpacitySlider.Value,
             AlwaysOnTop = OnTop.IsChecked == true,
+            TrayPercent = TrayPercent.IsChecked == true,
             WarnAt = warn,
             CritAt = crit,
             Left = _original.Left,

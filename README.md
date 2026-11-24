@@ -92,6 +92,10 @@ Cobrem:
   acima, por isso o widget fica com o mais alto da mesma janela; e a
   repartição da semana que vem com ele (Claude Code, claude.ai, Cowork), que
   fica com o resumo dessa semana;
+- o ícone junto ao relógio: a percentagem cabe em 16 px, mesmo o "100";
+- o aviso de uma tarefa sem avançar: a hora da última linha da conversa, sem
+  contar as que o Claude Code escreve numa sessão parada; o que fica de fora
+  (subagentes, sessões sem transcript); e um aviso por paragem;
 - os títulos das sessões, os lembretes dos avisos, o consumo por projeto, o
   contexto ocupado de cada sessão (com e sem o tamanho da janela do
   statusline), o que cada sessão está a fazer e as sessões recentes e o comando
