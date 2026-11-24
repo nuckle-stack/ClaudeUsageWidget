@@ -101,8 +101,9 @@ public class UsageScreenTests
 
         Assert.Equal("não há resposta do /usage desta conta", Why("""{"numStartups": 3}"""));
         Assert.Equal("não vem na resposta do /usage (sem seven_day_breakdown)", Why(Config.Replace("\"seven_day_breakdown\"", "\"something_else\"")));
-        Assert.Equal("não vem na resposta do /usage (seven_day_breakdown: null)",
-            Why("""{"cachedUsageUtilization": {"fetchedAtMs": 1, "utilization": {"seven_day_breakdown": null}}}"""));
+        // As a colleague's account answers: the account gets none.
+        Assert.Equal(UsageScreen.Withheld, Why("""{"cachedUsageUtilization": {"fetchedAtMs": 1, "utilization": {"seven_day_breakdown": null}}}"""));
+        Assert.Equal("não vem na resposta do /usage (seven_day_breakdown: null)", UsageScreen.Withheld);
         Assert.Equal("o seven_day_breakdown não tem as datas ou as linhas",
             Why("""{"cachedUsageUtilization": {"fetchedAtMs": 1, "utilization": {"seven_day_breakdown": {"as_of": null, "rows": []}}}}"""));
         Assert.Equal("o seven_day_breakdown tem 2 linha(s), todas a 0",

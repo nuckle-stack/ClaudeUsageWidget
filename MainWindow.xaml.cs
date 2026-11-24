@@ -35,6 +35,8 @@ public partial class MainWindow : Window
     private Limits? _usage;
     /// <summary>And its breakdown of the week: Claude Code, claude.ai, Cowork...</summary>
     private WeekSources? _usageWeek;
+    /// <summary>The last /usage said this account gets no breakdown of the week (see UsageScreen.Withheld).</summary>
+    private bool _usageWithheld;
     private DateTime _usageStamp, _usageReadAt;
     private static readonly Color NormalBack = Hex("#F015151A");
     private static readonly Color NormalBorder = Hex("#30FFFFFF");
@@ -360,7 +362,7 @@ public partial class MainWindow : Window
         foreach (var week in new[] { current, last })
             if (week is not null) WeekReport.Attach(week, _usageWeek);
 
-        _weekWindow = new WeekWindow(this, current, last, _weeks, showLast, _usage?.UpdatedAt ?? 0);
+        _weekWindow = new WeekWindow(this, current, last, _weeks, showLast, _usage?.UpdatedAt ?? 0, _usageWithheld);
         _weekWindow.Closed += (_, _) => _weekWindow = null;
         _weekWindow.Show();
         WindowFocus.BringToFront(new WindowInteropHelper(_weekWindow).EnsureHandle());
@@ -776,12 +778,13 @@ public partial class MainWindow : Window
         {
             var stamp = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : default;
             if (stamp == _usageStamp) return;
-            var (ok, usage, week) = await Task.Run(() => (UsageScreen.TryLoad(path, out var u, out var w), u, w));
+            var (ok, usage, week, missing) = await Task.Run(() => (UsageScreen.TryLoad(path, out var u, out var w, out var m), u, w, m));
             // Half-written: try again next time.
             if (!ok) return;
             _usageStamp = stamp;
             _usage = usage;
             _usageWeek = week;
+            _usageWithheld = missing == UsageScreen.Withheld;
         }
         catch { }
     }

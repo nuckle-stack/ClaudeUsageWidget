@@ -92,7 +92,8 @@ Cobrem:
   acima, por isso o widget fica com o mais alto da mesma janela; e a
   repartição da semana que vem com ele (Claude Code, claude.ai, Cowork), que
   fica com o resumo da semana em que o `/usage` foi aberto; o que o resumo diz
-  quando o `/usage` não a trouxe, e porquê no diagnóstico;
+  quando o `/usage` não a trouxe, e porquê no diagnóstico; e o resumo sem ela
+  nas contas que não a recebem (o `/usage` dá-a a `null`);
 - o ícone junto ao relógio: a percentagem cabe em 16 px, mesmo o "100"; e pô-lo
   na barra de tarefas ou no "^" (numa chave do registo dos testes, nunca na do
   Windows), reconhecendo o caminho do widget com ou sem uma pasta conhecida à

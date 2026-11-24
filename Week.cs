@@ -109,15 +109,16 @@ public static class WeekReport
     /// The line under where the week went: which /usage it is from; for the
     /// week running without it, whether /usage was opened this week (usageAt:
     /// when it last was, 0 if never) and left it out, or how to get it; empty
-    /// for a week that ended without it.
+    /// for a week that ended without it, and when the last /usage said this
+    /// account gets none (withheld): asking for /usage again would not help.
     /// </summary>
-    public static string SourcesNote(WeekSummary week, long usageAt, long now)
+    public static string SourcesNote(WeekSummary week, long usageAt, long now, bool withheld = false)
     {
         var running = week.ResetAt > now;
         if (week.Sources.Count > 0)
             return $"Segundo o /usage de {Moment(week.SourcesAsOf)}." +
                    (running && now - week.SourcesAsOf > 3600 ? " Abre-o outra vez para atualizar." : "");
-        if (!running) return "";
+        if (!running || withheld) return "";
         return usageAt >= week.Start
             ? $"O /usage de {Moment(usageAt)} não diz de onde veio o uso, por isso não há nada para mostrar aqui."
             : "Abre o /usage no Claude Code para ver aqui quanto veio do claude.ai, do Cowork e de outros PCs.";

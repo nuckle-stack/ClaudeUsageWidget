@@ -31,11 +31,13 @@ public partial class WeekWindow : Window
     private readonly WeekLog _log;
     /// <summary>When /usage was last opened (unix seconds), 0 if never.</summary>
     private readonly long _usageAt;
+    /// <summary>The last /usage said this account gets no breakdown of the week.</summary>
+    private readonly bool _withheld;
     /// <summary>The week shown, when not the list.</summary>
     private WeekSummary? _week;
     private bool _list;
 
-    public WeekWindow(Window anchor, WeekSummary? current, WeekSummary? last, WeekLog log, bool showLast, long usageAt = 0)
+    public WeekWindow(Window anchor, WeekSummary? current, WeekSummary? last, WeekLog log, bool showLast, long usageAt = 0, bool withheld = false)
     {
         InitializeComponent();
         _anchor = anchor;
@@ -43,6 +45,7 @@ public partial class WeekWindow : Window
         _last = last;
         _log = log;
         _usageAt = usageAt;
+        _withheld = withheld;
         _week = showLast && last is not null ? last : current;
 
         Loaded += (_, _) => { Place(); Activate(); };
@@ -121,7 +124,7 @@ public partial class WeekWindow : Window
     /// </summary>
     private void RenderSources(WeekSummary week, long now)
     {
-        SourceWhen.Text = WeekReport.SourcesNote(week, _usageAt, now);
+        SourceWhen.Text = WeekReport.SourcesNote(week, _usageAt, now, _withheld);
         SourceBox.Visibility = SourceWhen.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         if (week.Sources.Count == 0)
         {

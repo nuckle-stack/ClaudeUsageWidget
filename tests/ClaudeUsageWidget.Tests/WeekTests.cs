@@ -199,8 +199,13 @@ public class WeekTests
         Assert.Equal("O /usage de dom 22/11 20:30 não diz de onde veio o uso, por isso não há nada para mostrar aqui.",
             WeekReport.SourcesNote(week, Unix(Local(22, 20, 30)), now));
 
+        // The last /usage said this account gets none: nothing to ask for, this week or the next.
+        Assert.Equal("", WeekReport.SourcesNote(week, Unix(Local(22, 20, 30)), now, withheld: true));
+        Assert.Equal("", WeekReport.SourcesNote(week, Unix(Local(16, 12)), now, withheld: true));
+
         WeekReport.Attach(week, Sources(LastReset, Unix(Local(22, 20, 30))));
         Assert.Equal("Segundo o /usage de dom 22/11 20:30.", WeekReport.SourcesNote(week, Unix(Local(22, 20, 30)), now));
+        Assert.Equal("Segundo o /usage de dom 22/11 20:30.", WeekReport.SourcesNote(week, Unix(Local(22, 20, 30)), now, withheld: true));
         Assert.Equal("Segundo o /usage de dom 22/11 20:30. Abre-o outra vez para atualizar.",
             WeekReport.SourcesNote(week, Unix(Local(22, 20, 30)), now + 2 * 3600));
 

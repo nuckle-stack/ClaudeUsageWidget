@@ -96,6 +96,13 @@ public static class UsageScreen
     /// </summary>
     public static WeekSources? ParseWeek(JsonElement root) => ParseWeek(root, out _);
 
+    /// <summary>
+    /// Why there is none when the answer has the breakdown, but null: the
+    /// account does not get one (seen on a colleague's), so opening /usage
+    /// again would not bring it.
+    /// </summary>
+    public const string Withheld = "não vem na resposta do /usage (seven_day_breakdown: null)";
+
     /// <summary>The same, saying why there is none (for the diagnostics).</summary>
     public static WeekSources? ParseWeek(JsonElement root, out string missing)
     {
@@ -107,9 +114,12 @@ public static class UsageScreen
         }
         if (!answer.TryGetProperty("seven_day_breakdown", out var b) || b.ValueKind != JsonValueKind.Object)
         {
-            missing = b.ValueKind == JsonValueKind.Undefined
-                ? "não vem na resposta do /usage (sem seven_day_breakdown)"
-                : $"não vem na resposta do /usage (seven_day_breakdown: {b.ValueKind.ToString().ToLowerInvariant()})";
+            missing = b.ValueKind switch
+            {
+                JsonValueKind.Undefined => "não vem na resposta do /usage (sem seven_day_breakdown)",
+                JsonValueKind.Null => Withheld,
+                var kind => $"não vem na resposta do /usage (seven_day_breakdown: {kind.ToString().ToLowerInvariant()})",
+            };
             return null;
         }
         if (Time(b, "window_started_at") is not { } start || Time(b, "as_of") is not { } asOf ||
