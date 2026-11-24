@@ -29,17 +29,20 @@ public partial class WeekWindow : Window
     private readonly WeekSummary? _current;
     private readonly WeekSummary? _last;
     private readonly WeekLog _log;
+    /// <summary>When /usage was last opened (unix seconds), 0 if never.</summary>
+    private readonly long _usageAt;
     /// <summary>The week shown, when not the list.</summary>
     private WeekSummary? _week;
     private bool _list;
 
-    public WeekWindow(Window anchor, WeekSummary? current, WeekSummary? last, WeekLog log, bool showLast)
+    public WeekWindow(Window anchor, WeekSummary? current, WeekSummary? last, WeekLog log, bool showLast, long usageAt = 0)
     {
         InitializeComponent();
         _anchor = anchor;
         _current = current;
         _last = last;
         _log = log;
+        _usageAt = usageAt;
         _week = showLast && last is not null ? last : current;
 
         Loaded += (_, _) => { Place(); Activate(); };
@@ -80,7 +83,7 @@ public partial class WeekWindow : Window
         }
 
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        Period.Text = $"{When(week.Start)} → {When(week.ResetAt)}" + (week.ResetAt > now ? " · em curso" : "");
+        Period.Text = $"{WeekReport.Moment(week.Start)} → {WeekReport.Moment(week.ResetAt)}" + (week.ResetAt > now ? " · em curso" : "");
         Total.Text = $"{WeekReport.Pct(week.Used)} do limite semanal";
         var before = _log.Before(week.ResetAt);
         Compare.Text = before is null ? "" : $"Semana anterior: {WeekReport.Pct(before.Used)}";
@@ -118,20 +121,17 @@ public partial class WeekWindow : Window
     /// </summary>
     private void RenderSources(WeekSummary week, long now)
     {
-        var running = week.ResetAt > now;
-        SourceBox.Visibility = week.Sources.Count > 0 || running ? Visibility.Visible : Visibility.Collapsed;
+        SourceWhen.Text = WeekReport.SourcesNote(week, _usageAt, now);
+        SourceBox.Visibility = SourceWhen.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         if (week.Sources.Count == 0)
         {
             SourceList.ItemsSource = null;
-            SourceWhen.Text = "Abre o /usage no Claude Code para ver aqui quanto veio do claude.ai, do Cowork e de outros PCs.";
             return;
         }
         var top = Math.Max(1, week.Sources.Max(s => s.Points));
         SourceList.ItemsSource = week.Sources.Select(s => new BarRow(
             s.Name, BarMax * s.Points / top, Blue, WeekReport.Pct(s.Points),
             $"{s.Name}: {WeekReport.Pct(s.Points)} do limite semanal ({WeekReport.Pct(s.Share)} do uso da semana)")).ToList();
-        SourceWhen.Text = $"Segundo o /usage de {When(week.SourcesAsOf)}." +
-                          (running && now - week.SourcesAsOf > 3600 ? " Abre-o outra vez para atualizar." : "");
     }
 
     /// <summary>
@@ -159,9 +159,6 @@ public partial class WeekWindow : Window
         HistoryNote.Text = string.Join(" ", notes);
         HistoryNote.Visibility = notes.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
-
-    private static string When(long unix) =>
-        DateTimeOffset.FromUnixTimeSeconds(unix).LocalDateTime is var t ? $"{WeekReport.DayLabel(t)}/{t:MM} {t:HH:mm}" : "";
 
     private void OnTabNow(object sender, MouseButtonEventArgs e) { _week = _current; _list = false; Render(); }
     private void OnTabLast(object sender, MouseButtonEventArgs e) { _week = _last; _list = false; Render(); }

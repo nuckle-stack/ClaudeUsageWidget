@@ -360,7 +360,7 @@ public partial class MainWindow : Window
         foreach (var week in new[] { current, last })
             if (week is not null) WeekReport.Attach(week, _usageWeek);
 
-        _weekWindow = new WeekWindow(this, current, last, _weeks, showLast);
+        _weekWindow = new WeekWindow(this, current, last, _weeks, showLast, _usage?.UpdatedAt ?? 0);
         _weekWindow.Closed += (_, _) => _weekWindow = null;
         _weekWindow.Show();
         WindowFocus.BringToFront(new WindowInteropHelper(_weekWindow).EnsureHandle());

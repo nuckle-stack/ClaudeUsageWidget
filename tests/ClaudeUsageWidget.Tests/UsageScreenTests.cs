@@ -90,6 +90,30 @@ public class UsageScreenTests
     }
 
     [Fact]
+    public void ParseWeek_says_why_there_is_no_breakdown()
+    {
+        string Why(string json)
+        {
+            using var doc = JsonDocument.Parse(json);
+            Assert.Null(UsageScreen.ParseWeek(doc.RootElement, out var missing));
+            return missing;
+        }
+
+        Assert.Equal("não há resposta do /usage desta conta", Why("""{"numStartups": 3}"""));
+        Assert.Equal("não vem na resposta do /usage (sem seven_day_breakdown)", Why(Config.Replace("\"seven_day_breakdown\"", "\"something_else\"")));
+        Assert.Equal("não vem na resposta do /usage (seven_day_breakdown: null)",
+            Why("""{"cachedUsageUtilization": {"fetchedAtMs": 1, "utilization": {"seven_day_breakdown": null}}}"""));
+        Assert.Equal("o seven_day_breakdown não tem as datas ou as linhas",
+            Why("""{"cachedUsageUtilization": {"fetchedAtMs": 1, "utilization": {"seven_day_breakdown": {"as_of": null, "rows": []}}}}"""));
+        Assert.Equal("o seven_day_breakdown tem 2 linha(s), todas a 0",
+            Why("""{"cachedUsageUtilization": {"fetchedAtMs": 1, "utilization": {"seven_day_breakdown": {"as_of": "2026-11-22T21:31:55Z", "window_started_at": "2026-11-17T18:00:00Z", "rows": [{"key": "chat", "percent": 0}, {"key": "cowork", "percent": 0}]}}}}"""));
+
+        using var doc = JsonDocument.Parse(Config);
+        Assert.NotNull(UsageScreen.ParseWeek(doc.RootElement, out var none));
+        Assert.Equal("", none);
+    }
+
+    [Fact]
     public void ParseWeek_names_an_unknown_place_as_usage_does()
     {
         var w = Sources("""{"cachedUsageUtilization": {"fetchedAtMs": 1, "utilization": {"seven_day_breakdown": {"as_of": "2026-11-22T21:31:55Z", "window_started_at": "2026-11-17T18:00:00Z", "rows": [{"key": "chat", "display_name": "Chats", "percent": 40, "percent_of_limit": 4}, {"key": "new_thing", "display_name": "New thing", "percent": 60, "percent_of_limit": 6}]}}}}""")!;

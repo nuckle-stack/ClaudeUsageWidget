@@ -14,6 +14,27 @@ public class DiagnosticsTests
         return _dir;
     }
 
+    // ---- /usage's breakdown of the week -----------------------------------------
+
+    [Fact]
+    public void The_breakdown_line_gives_its_keys_or_why_there_is_none()
+    {
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var reset = now + 2 * 86400;
+        Limits Week(long resets) => new() { UpdatedAt = now, SevenDay = new LimitWindow { UsedPercentage = 30, ResetsAt = resets } };
+        Diagnostics.Live Live(Limits statusline) => new(new Config(), statusline, new Limits(), false, (0, 0), "", [], 0);
+        var split = new WeekSources(reset - 7 * 86400, now - 120, [new("claude_code", "Claude Code", 28, 94), new("cowork", "Cowork", 2.5, 6)]);
+
+        var line = Diagnostics.Split(split, "", Live(Week(reset)), now);
+        Assert.Matches(@"^semana desde \d\d/\d\d \d\d:\d\d, há 2 min \(.+\): claude_code 28 · cowork 2[,.]5$", line);
+
+        // Another week than the statusline's: said, as that is why it would not show.
+        Assert.Contains("(a semana do statusline começou ", Diagnostics.Split(split, "", Live(Week(reset + 3 * 3600)), now));
+
+        Assert.Equal("não vem na resposta do /usage (seven_day_breakdown: null).",
+            Diagnostics.Split(null, "não vem na resposta do /usage (seven_day_breakdown: null)", Live(Week(reset)), now));
+    }
+
     // ---- privacy -------------------------------------------------------------
 
     [Fact]

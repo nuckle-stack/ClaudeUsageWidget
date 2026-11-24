@@ -84,10 +84,12 @@ public static class Diagnostics
         Line("Último hello (ping.json): " + (live.Ping.UpdatedAt > 0
             ? $"{Ago(live.Ping.UpdatedAt, now)} · {Windows(live.Ping)}{(live.Ping.Estimated ? " · estimativa, sem limites na resposta" : "")}{Overage(live.Ping.Overage)}"
             : "nenhum."));
-        Line("Último /usage (.claude.json): " + (!UsageScreen.TryLoad(UsageScreen.ConfigFile, out var shown)
+        var usageRead = UsageScreen.TryLoad(UsageScreen.ConfigFile, out var shown, out var split, out var missing);
+        Line("Último /usage (.claude.json): " + (!usageRead
             ? "não se consegue ler."
             : shown is null ? "nenhum (aparece depois de abrir /usage no Claude Code)."
             : $"{Ago(shown.UpdatedAt, now)} · {Windows(shown)}"));
+        if (usageRead && shown is not null) Line("De onde veio o uso (/usage): " + Split(split, missing, live, now));
         Line("Hello: " + (live.HelloRunning ? "a correr agora."
             : live.Backoff.Failures == 0 ? "sem falhas."
             : $"{live.Backoff.Failures} falha(s) seguidas; próxima tentativa {At(live.Backoff.NextAttemptAt)}."));
@@ -388,6 +390,22 @@ public static class Diagnostics
 
     private static string Window(LimitWindow? w) =>
         w?.ResetsAt is not { } r ? "sem dados" : $"{w.UsedPercentage ?? 0:0}% (renova {At(r)})";
+
+    /// <summary>
+    /// /usage's breakdown of the week, by its keys ("claude_code 28 · cowork 2"),
+    /// or why there is none; and the week the statusline is in, when it is
+    /// another one.
+    /// </summary>
+    internal static string Split(WeekSources? split, string missing, Live live, long now)
+    {
+        if (split is null) return missing + ".";
+        var text = $"semana desde {At(split.Start)}, {Ago(split.AsOf, now)}: " +
+                   string.Join(" · ", split.Rows.Select(r => $"{r.Key} {r.Points:0.#}"));
+        if ((live.Statusline.SevenDay?.ResetsAt ?? live.Ping.SevenDay?.ResetsAt) is { } reset &&
+            Math.Abs(reset - 7 * 86400 - split.Start) > 3600)
+            text += $" (a semana do statusline começou {At(reset - 7 * 86400)})";
+        return text;
+    }
 
     private static string Overage(OverageInfo? o) =>
         o is null ? "" : $" · uso extra: {(o.Using ? "em uso" : "não")}{(o.Status.Length > 0 ? $" ({o.Status})" : "")}";

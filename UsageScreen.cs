@@ -39,16 +39,19 @@ public static class UsageScreen
     public static bool TryLoad(string path, out Limits? usage) => TryLoad(path, out usage, out _);
 
     /// <summary>The same, with /usage's breakdown of the week.</summary>
-    public static bool TryLoad(string path, out Limits? usage, out WeekSources? week)
+    public static bool TryLoad(string path, out Limits? usage, out WeekSources? week) => TryLoad(path, out usage, out week, out _);
+
+    /// <summary>The same, with why there is no breakdown (for the diagnostics).</summary>
+    public static bool TryLoad(string path, out Limits? usage, out WeekSources? week, out string missing)
     {
-        (usage, week) = (null, null);
+        (usage, week, missing) = (null, null, "");
         try
         {
             if (!File.Exists(path)) return true;
             using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             using var doc = JsonDocument.Parse(fs);
             usage = Parse(doc.RootElement);
-            week = ParseWeek(doc.RootElement);
+            week = ParseWeek(doc.RootElement, out missing);
             return true;
         }
         catch
@@ -91,13 +94,30 @@ public static class UsageScreen
     /// "cowork", "display_name": "Cowork", "percent": 6, "percent_of_limit":
     /// 2}]}. The places nothing went to are left out; null when there is none.
     /// </summary>
-    public static WeekSources? ParseWeek(JsonElement root)
+    public static WeekSources? ParseWeek(JsonElement root) => ParseWeek(root, out _);
+
+    /// <summary>The same, saying why there is none (for the diagnostics).</summary>
+    public static WeekSources? ParseWeek(JsonElement root, out string missing)
     {
-        if (Answer(root) is not var (answer, _) ||
-            !answer.TryGetProperty("seven_day_breakdown", out var b) || b.ValueKind != JsonValueKind.Object ||
-            Time(b, "window_started_at") is not { } start || Time(b, "as_of") is not { } asOf ||
-            !b.TryGetProperty("rows", out var rows) || rows.ValueKind != JsonValueKind.Array)
+        missing = "";
+        if (Answer(root) is not var (answer, _))
+        {
+            missing = "não há resposta do /usage desta conta";
             return null;
+        }
+        if (!answer.TryGetProperty("seven_day_breakdown", out var b) || b.ValueKind != JsonValueKind.Object)
+        {
+            missing = b.ValueKind == JsonValueKind.Undefined
+                ? "não vem na resposta do /usage (sem seven_day_breakdown)"
+                : $"não vem na resposta do /usage (seven_day_breakdown: {b.ValueKind.ToString().ToLowerInvariant()})";
+            return null;
+        }
+        if (Time(b, "window_started_at") is not { } start || Time(b, "as_of") is not { } asOf ||
+            !b.TryGetProperty("rows", out var rows) || rows.ValueKind != JsonValueKind.Array)
+        {
+            missing = "o seven_day_breakdown não tem as datas ou as linhas";
+            return null;
+        }
 
         var list = new List<SourceUse>();
         foreach (var r in rows.EnumerateArray())
@@ -108,6 +128,7 @@ public static class UsageScreen
             var key = Text(r, "key") ?? "";
             list.Add(new SourceUse(key, SourceName(key, Text(r, "display_name") ?? ""), points, share));
         }
+        if (list.Count == 0) missing = $"o seven_day_breakdown tem {rows.GetArrayLength()} linha(s), todas a 0";
         return list.Count == 0 ? null : new WeekSources(start, asOf, list.OrderByDescending(s => s.Points).ThenByDescending(s => s.Share).ToList());
     }
 

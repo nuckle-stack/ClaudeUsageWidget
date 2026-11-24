@@ -92,15 +92,39 @@ public static class WeekReport
 
     /// <summary>
     /// Gives the week /usage's breakdown when it is that week's (it started
-    /// when the week did) and newer than the one it has. True when it did.
+    /// when the week did, or /usage was opened while the week ran) and newer
+    /// than the one it has. True when it did.
     /// </summary>
     public static bool Attach(WeekSummary week, WeekSources? sources)
     {
-        if (sources is null || Math.Abs(sources.Start - week.Start) > 3600 || sources.AsOf <= week.SourcesAsOf) return false;
+        if (sources is null || sources.AsOf <= week.SourcesAsOf) return false;
+        var ofWeek = Math.Abs(sources.Start - week.Start) <= 3600 || (sources.AsOf >= week.Start && sources.AsOf < week.ResetAt);
+        if (!ofWeek) return false;
         week.Sources = sources.Rows;
         week.SourcesAsOf = sources.AsOf;
         return true;
     }
+
+    /// <summary>
+    /// The line under where the week went: which /usage it is from; for the
+    /// week running without it, whether /usage was opened this week (usageAt:
+    /// when it last was, 0 if never) and left it out, or how to get it; empty
+    /// for a week that ended without it.
+    /// </summary>
+    public static string SourcesNote(WeekSummary week, long usageAt, long now)
+    {
+        var running = week.ResetAt > now;
+        if (week.Sources.Count > 0)
+            return $"Segundo o /usage de {Moment(week.SourcesAsOf)}." +
+                   (running && now - week.SourcesAsOf > 3600 ? " Abre-o outra vez para atualizar." : "");
+        if (!running) return "";
+        return usageAt >= week.Start
+            ? $"O /usage de {Moment(usageAt)} não diz de onde veio o uso, por isso não há nada para mostrar aqui."
+            : "Abre o /usage no Claude Code para ver aqui quanto veio do claude.ai, do Cowork e de outros PCs.";
+    }
+
+    /// <summary>"ter 24/11 10:30".</summary>
+    public static string Moment(long unix) => Local(unix) is var t ? $"{DayLabel(t)}/{t:MM} {t:HH:mm}" : "";
 
     /// <summary>The notification when a week ends.</summary>
     public static string Message(WeekSummary week, WeekSummary? previous)

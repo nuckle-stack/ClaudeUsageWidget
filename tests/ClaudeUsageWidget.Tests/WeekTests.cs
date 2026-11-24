@@ -175,6 +175,40 @@ public class WeekTests
     }
 
     [Fact]
+    public void Usage_opened_while_the_week_ran_is_that_weeks_even_when_its_start_is_off()
+    {
+        var week = WeekReport.Build(AWeek, Reset, Use(), Unix(Local(22, 21)))!;
+        // The start /usage gives is two hours off the reset's, but it was opened during the week.
+        Assert.True(WeekReport.Attach(week, Sources(LastReset + 2 * 3600, Unix(Local(20, 9)))));
+        // Opened after the reset: it is the next week's.
+        Assert.False(WeekReport.Attach(week, Sources(Reset + 2 * 3600, Reset + 3 * 3600)));
+        Assert.Equal(Unix(Local(20, 9)), week.SourcesAsOf);
+    }
+
+    [Fact]
+    public void The_line_under_where_the_week_went_says_what_usage_gave()
+    {
+        var now = Unix(Local(22, 21));
+        var week = WeekReport.Build(AWeek, Reset, Use(), now)!;
+
+        // Never opened, or not since the week began.
+        Assert.Equal("Abre o /usage no Claude Code para ver aqui quanto veio do claude.ai, do Cowork e de outros PCs.",
+            WeekReport.SourcesNote(week, 0, now));
+        Assert.StartsWith("Abre o /usage", WeekReport.SourcesNote(week, Unix(Local(16, 12)), now));
+        // Opened this week, without the breakdown: no point opening it again.
+        Assert.Equal("O /usage de dom 22/11 20:30 não diz de onde veio o uso, por isso não há nada para mostrar aqui.",
+            WeekReport.SourcesNote(week, Unix(Local(22, 20, 30)), now));
+
+        WeekReport.Attach(week, Sources(LastReset, Unix(Local(22, 20, 30))));
+        Assert.Equal("Segundo o /usage de dom 22/11 20:30.", WeekReport.SourcesNote(week, Unix(Local(22, 20, 30)), now));
+        Assert.Equal("Segundo o /usage de dom 22/11 20:30. Abre-o outra vez para atualizar.",
+            WeekReport.SourcesNote(week, Unix(Local(22, 20, 30)), now + 2 * 3600));
+
+        // A week that ended without it says nothing.
+        Assert.Equal("", WeekReport.SourcesNote(new WeekSummary { ResetAt = Reset }, Unix(Local(22, 20)), Reset + 60));
+    }
+
+    [Fact]
     public void The_message_says_what_went_outside_Claude_Code()
     {
         var week = new WeekSummary { Used = 30, Sources = Sources(LastReset, 1).Rows };
