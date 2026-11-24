@@ -189,15 +189,14 @@ public partial class MainWindow : Window
     {
         if (_updating) return;
         var version = update.Version.ToString(3);
-        var notes = update.Notes.Length > 0 ? $"\n\n{update.Notes}" : "";
         // Asked from a notification or the tray, the widget is not the active
         // window, and its question could open behind the others.
         if (!IsVisible) Show();
         WindowFocus.BringToFront(new WindowInteropHelper(this).Handle);
-        var answer = MessageBox.Show(this,
-            $"Instalar a versão {version} do Claude Usage agora?\n\nO widget fecha-se e volta a abrir sozinho em poucos segundos. As definições ficam.{notes}",
-            "Versão nova do Claude Usage", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
+        if (!DialogWindow.Ask(new Dialog(NoticeTone.Info, "Versão nova", $"Instalar o Claude Usage {version}?",
+                $"Tens a {Updater.Current.ToString(3)}. O widget fecha-se e volta a abrir sozinho em poucos segundos, com as mesmas definições.",
+                "Instalar", "Agora não", update.Notes, "Ver no GitHub", update.PageUrl), this))
+            return;
 
         _updating = true;
         try
@@ -216,7 +215,7 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>After an update, says so once; a click opens the release notes.</summary>
+    /// <summary>After an update, says so once; a click shows what changed.</summary>
     private void AnnounceUpdated()
     {
         if (_updater.JustUpdatedFrom() is not { } from) return;
@@ -224,7 +223,41 @@ public partial class MainWindow : Window
         Log.Write($"Atualizado de {from} para {now}.");
         Notify(new(NoticeTone.Done, "Atualização", $"Estás na versão {now}", "Do Claude Usage, com as definições de antes.",
                 Action: "Ver novidades", Key: "update"),
-            () => OpenUrl($"https://github.com/{Updater.Repo}/releases/tag/v{now}"));
+            () => ShowNews(from));
+    }
+
+    /// <summary>
+    /// The notes of each version since the one before the update, in the
+    /// widget's look; GitHub's page when they can't be read.
+    /// </summary>
+    private async void ShowNews(string from)
+    {
+        var now = Updater.Current.ToString(3);
+        var page = $"https://github.com/{Updater.Repo}/releases/tag/v{now}";
+        List<UpdateInfo> releases;
+        try
+        {
+            releases = Version.TryParse(from, out var before) ? await Updater.ReleasesSinceAsync(before) : [];
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Não deu para ler as novidades: {ex.Message}");
+            releases = [];
+        }
+        if (releases.Count == 0)
+        {
+            OpenUrl(page);
+            return;
+        }
+        var notes = ReleaseNotes.Combine(releases.Select(r => (r.Version, r.Notes)).ToList());
+        var several = releases.Count > 1;
+        if (!IsVisible) Show();
+        WindowFocus.BringToFront(new WindowInteropHelper(this).Handle);
+        DialogWindow.Ask(new Dialog(NoticeTone.Done, "Novidades",
+            several ? $"O que mudou desde a {from}" : $"O que há de novo na {now}",
+            $"Estás na versão {now}, com as definições de antes." + (several ? " Uma parte por versão, a mais recente primeiro." : ""),
+            "Fechar",
+            Notes: notes, LinkText: "Ver no GitHub", LinkUrl: page), this);
     }
 
     private static void OpenUrl(string url)
@@ -754,38 +787,58 @@ public partial class MainWindow : Window
     }
 
     /// <summary>The limits shown: the freshest of the statusline and the hello, raised to what /usage last showed.</summary>
+    private readonly ToolTip _tip = new();
+
     private Limits Current() => UsageScreen.Merge(_hello.Current(_limits), _usage);
 
     private void Render()
     {
         var cur = Current();
-        var t5 = RenderRow(cur.FiveHour, Fill5, Pct5, Time5, cur.Estimated);
-        var t7 = RenderRow(cur.SevenDay, Fill7, Pct7, Time7, false);
+        var (t5, limit5) = RenderRow("5h", cur.FiveHour, Fill5, Pct5, Time5, cur.Estimated);
+        var (t7, limit7) = RenderRow("7d", cur.SevenDay, Fill7, Pct7, Time7, false);
         if (!cur.Estimated)
         {
             ShowExhaustion(true, Time5);
             ShowExhaustion(false, Time7);
         }
 
+        // The tray's tooltip is the Windows one, plain text; the widget's is a card (WidgetTip).
         var tip = $"Claude Code\n5h: {t5}\n7d: {t7}";
+        var state = new List<(string, NoticeTone)>();
         // Near the top: the tray cuts its tooltip at 127 characters.
-        if (_hello.Ping.Overage?.ActiveAt(DateTimeOffset.UtcNow.ToUnixTimeSeconds()) == true) tip += "\nUso extra pago: ativo";
+        if (_hello.Ping.Overage?.ActiveAt(DateTimeOffset.UtcNow.ToUnixTimeSeconds()) == true)
+        {
+            tip += "\nUso extra pago: ativo";
+            state.Add(("Uso extra pago ativo", NoticeTone.Crit));
+        }
         var waiting = _alerts.Waiting();
         if (waiting.Count > 0)
         {
             var oldest = waiting.Min(a => a.RaisedAt);
             var since = DateTime.UtcNow - oldest;
-            tip += $"\nÀ tua espera: {waiting.Count}" + (since.TotalMinutes >= 1 ? $" (há {FormatLeft(since)})" : "");
+            var ago = since.TotalMinutes >= 1 ? $" (há {FormatLeft(since)})" : "";
+            tip += $"\nÀ tua espera: {waiting.Count}" + ago;
+            state.Add(((waiting.Count == 1 ? "Uma sessão à tua espera" : $"{waiting.Count} sessões à tua espera") + ago, NoticeTone.Input));
         }
         if (ForecastText() is { Length: > 0 } forecast) tip += "\nRitmo\n" + forecast;
         var quiet = Quiet;
         QuietIcon.Visibility = quiet ? Visibility.Visible : Visibility.Collapsed;
-        if (quiet) tip += "\n" + QuietLabel();
-        if (_hello.Running) tip += "\nA atualizar…";
+        if (quiet)
+        {
+            tip += "\n" + QuietLabel();
+            state.Add((QuietLabel(), NoticeTone.Info));
+        }
+        var corner = "";
+        if (_hello.Running)
+        {
+            tip += "\nA atualizar…";
+            corner = "a atualizar…";
+        }
         else if (cur.UpdatedAt > 0)
         {
             var age = DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeSeconds(cur.UpdatedAt);
             tip += age.TotalMinutes < 1 ? "\nAtualizado agora" : $"\nAtualizado há {FormatLeft(age)}";
+            corner = age.TotalMinutes < 1 ? "atualizado agora" : $"atualizado há {FormatLeft(age)}";
         }
         _tray.Text = tip.Length > 127 ? tip[..127] : tip;
         // The number the bar shows: none without a reading, 0 once the window renewed.
@@ -793,11 +846,14 @@ public partial class MainWindow : Window
             ? (resets <= DateTimeOffset.UtcNow.ToUnixTimeSeconds() ? 0 : Percent(cur.FiveHour))
             : null;
         _trayIcon.Show(_tray, _cfg.TrayPercent ? shown : null, LevelOf(shown ?? 0));
-        Root.ToolTip = tip + (_cfg.AutoHello.Enabled ? "\nAuto-hello: ligado" : "\nAuto-hello: desligado");
+        // One tooltip, its content replaced: an open one changes in place.
+        _tip.Content = WidgetTip.Build(corner, [limit5, limit7], ForecastPanel(), state,
+            _cfg.AutoHello.Enabled ? "Auto-hello ligado" : "Auto-hello desligado");
+        if (Root.ToolTip != _tip) Root.ToolTip = _tip;
     }
 
     /// <summary>Paints one row and returns its plain-text summary for the tooltip.</summary>
-    private string RenderRow(LimitWindow? w, Border fill, TextBlock pct, TextBlock time, bool estimated)
+    private (string Plain, WidgetTip.Limit Tip) RenderRow(string label, LimitWindow? w, Border fill, TextBlock pct, TextBlock time, bool estimated)
     {
         time.Foreground = Dim;
         if (w?.ResetsAt is not long resetsAt)
@@ -805,7 +861,7 @@ public partial class MainWindow : Window
             fill.Width = 0;
             pct.Text = "--";
             time.Text = "";
-            return "sem dados";
+            return ("sem dados", new(label, "--", Color.FromArgb(0x99, 0xFF, 0xFF, 0xFF), "sem dados ainda"));
         }
 
         var left = DateTimeOffset.FromUnixTimeSeconds(resetsAt) - DateTimeOffset.UtcNow;
@@ -815,7 +871,7 @@ public partial class MainWindow : Window
             pct.Text = "0%";
             pct.Foreground = Ok;
             time.Text = "renovou";
-            return "renovou";
+            return ("renovou", new(label, "0%", ((SolidColorBrush)Ok).Color, "renovou"));
         }
 
         var p = Percent(w);
@@ -825,7 +881,9 @@ public partial class MainWindow : Window
         pct.Foreground = brush;
         pct.Text = $"{p}%";
         time.Text = (estimated ? "~" : "") + FormatLeft(left);
-        return $"{p}% (faltam {time.Text})";
+        var renews = UsageHistory.DayAndTime(DateTimeOffset.FromUnixTimeSeconds(resetsAt), DateTime.Now);
+        return ($"{p}% (faltam {time.Text})",
+            new(label, pct.Text, ((SolidColorBrush)brush).Color, $"renova {(estimated ? "por volta de " : "")}{renews} (faltam {time.Text})"));
     }
 
     /// <summary>
@@ -943,9 +1001,14 @@ public partial class MainWindow : Window
     {
         var dir = Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? Installer.DefaultDir;
         var steps = new List<string>();
+        var failed = false;
         try { Installer.Uninstall(dir, steps.Add); }
-        catch (Exception ex) { steps.Add($"Não deu para remover tudo: {ex.Message}"); }
-        MessageBox.Show(string.Join("\n", steps), "Claude Usage Widget", MessageBoxButton.OK, MessageBoxImage.Information);
+        catch (Exception ex)
+        {
+            steps.Add($"Não deu para remover tudo: {ex.Message}");
+            failed = true;
+        }
+        DialogWindow.Ask(Dialog.Removed(steps, failed));
         Installer.RemoveFilesAfterExit(dir);
         Exit();
     }
@@ -1036,16 +1099,17 @@ public partial class MainWindow : Window
     private void SetupTray()
     {
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("Mostrar / esconder", null, (_, _) => ToggleVisible());
-        menu.Items.Add("Repor posição do widget", null, (_, _) => ResetPosition());
-        menu.Items.Add("Resumo da semana", null, (_, _) => OpenWeek(showLast: false));
-        var goTo = new Forms.ToolStripMenuItem("Ir para a sessão à tua espera", null, (_, _) => GoToWaiting());
+        TrayMenu.Apply(menu);
+        menu.Items.Add("Mostrar / esconder", null, (_, _) => ToggleVisible()).WithIcon("E7B3");
+        menu.Items.Add("Repor posição do widget", null, (_, _) => ResetPosition()).WithIcon("E81D");
+        menu.Items.Add("Resumo da semana", null, (_, _) => OpenWeek(showLast: false)).WithIcon("E787");
+        var goTo = new Forms.ToolStripMenuItem("Ir para a sessão à tua espera", null, (_, _) => GoToWaiting()).WithIcon("E8A7");
         menu.Items.Add(goTo);
-        var quiet = new Forms.ToolStripMenuItem("Não incomodar");
+        var quiet = new Forms.ToolStripMenuItem("Não incomodar").WithIcon("E708");
         menu.Items.Add(quiet);
-        var sound = new Forms.ToolStripMenuItem("Som dos avisos", null, (_, _) => ToggleSound());
+        var sound = new Forms.ToolStripMenuItem("Som dos avisos", null, (_, _) => ToggleSound()).WithIcon("E767");
         menu.Items.Add(sound);
-        var update = new Forms.ToolStripMenuItem("Procurar versão nova", null, (_, _) => UpdateFromMenu());
+        var update = new Forms.ToolStripMenuItem("Procurar versão nova", null, (_, _) => UpdateFromMenu()).WithIcon("E896");
         menu.Opening += (_, _) =>
         {
             FillQuietTray(quiet);
@@ -1053,18 +1117,44 @@ public partial class MainWindow : Window
             goTo.ShortcutKeyDisplayString = GoToWaitingMenu.InputGestureText;
             update.Text = UpdateLabel();
         };
-        menu.Items.Add("Definições…", null, (_, _) => OpenSettings());
-        menu.Items.Add("Atualizar agora", null, (_, _) => HelloNow());
-        menu.Items.Add("Copiar diagnóstico", null, (_, _) => CopyDiagnostics());
+        menu.Items.Add("Definições…", null, (_, _) => OpenSettings()).WithIcon("E713");
+        menu.Items.Add("Atualizar agora", null, (_, _) => HelloNow()).WithIcon("E72C");
+        menu.Items.Add("Copiar diagnóstico", null, (_, _) => CopyDiagnostics()).WithIcon("E8C8");
         menu.Items.Add(update);
         menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add("Sair", null, (_, _) => Exit());
+        menu.Items.Add("Sair", null, (_, _) => Exit()).WithIcon("E7E8");
 
         _tray.ContextMenuStrip = menu;
         _trayIcon.Show(_tray, null, "ok");
         _tray.Text = "Claude Usage";
         _tray.Visible = true;
         _tray.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) ToggleVisible(); };
+        PinTrayOnce();
+    }
+
+    /// <summary>
+    /// Windows puts a new tray icon in the "^", and the icon's percentage is
+    /// only worth having where you see it: once, it goes on the taskbar. After
+    /// that, Windows' setting (or the widget's) decides. Windows writes the
+    /// icon's entry a moment after it first shows, so this tries for a while.
+    /// </summary>
+    private void PinTrayOnce()
+    {
+        if (_cfg.TrayPinOffered || Environment.ProcessPath is not { } exe) return;
+        var tries = 0;
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        timer.Tick += (_, _) =>
+        {
+            tries++;
+            var pinned = TrayPin.IsPinned(exe);
+            if (pinned is null && tries < 20) return;
+            timer.Stop();
+            if (pinned is null) return;   // not Windows 11, or no entry: nothing to do, try at the next start
+            if (pinned == false && TrayPin.Pin(exe, true)) Log.Write("Ícone junto ao relógio posto na barra de tarefas (uma vez).");
+            _cfg.TrayPinOffered = true;
+            Json.Save(Paths.Config, _cfg);
+        };
+        timer.Start();
     }
 
     private static Color Hex(string hex) => (Color)ColorConverter.ConvertFromString(hex);

@@ -7,6 +7,10 @@
         Topmost="True" UseLayoutRounding="True" SnapsToDevicePixels="True"
         FontFamily="Segoe UI" FontSize="11">
     <Window.Resources>
+        <ResourceDictionary>
+        <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="/ClaudeUsageWidget;component/Theme.xaml"/>
+        </ResourceDictionary.MergedDictionaries>
         <Style x:Key="Label" TargetType="TextBlock">
             <Setter Property="Foreground" Value="#99FFFFFF"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -30,24 +34,25 @@
             <Setter Property="CornerRadius" Value="3"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
         </Style>
+        </ResourceDictionary>
     </Window.Resources>
 
     <Border x:Name="Root" CornerRadius="8" Background="#F015151A" BorderBrush="#30FFFFFF"
             BorderThickness="1" Padding="10,6" MouseLeftButtonDown="OnDrag">
         <Border.ContextMenu>
             <ContextMenu>
-                <MenuItem Header="Sessões ativas" Click="OnSessions"/>
-                <MenuItem Header="Resumo da semana" Click="OnWeek"/>
-                <MenuItem x:Name="GoToWaitingMenu" Header="Ir para a sessão à tua espera" Click="OnGoToWaiting"/>
-                <MenuItem x:Name="QuietMenu" Header="Não incomodar"/>
-                <MenuItem x:Name="SoundMenu" Header="Som dos avisos" IsCheckable="True" Click="OnToggleSound"/>
-                <MenuItem Header="Definições…" Click="OnSettings"/>
-                <MenuItem Header="Atualizar agora" Click="OnHelloNow"/>
-                <MenuItem Header="Copiar diagnóstico" Click="OnCopyDiagnostics"/>
-                <MenuItem x:Name="UpdateMenu" Header="Procurar versão nova" Click="OnUpdate"/>
+                <MenuItem Header="Sessões ativas" Icon="&#xE8FD;" Click="OnSessions"/>
+                <MenuItem Header="Resumo da semana" Icon="&#xE787;" Click="OnWeek"/>
+                <MenuItem x:Name="GoToWaitingMenu" Header="Ir para a sessão à tua espera" Icon="&#xE8A7;" Click="OnGoToWaiting"/>
+                <MenuItem x:Name="QuietMenu" Header="Não incomodar" Icon="&#xE708;"/>
+                <MenuItem x:Name="SoundMenu" Header="Som dos avisos" Icon="&#xE767;" IsCheckable="True" Click="OnToggleSound"/>
+                <MenuItem Header="Definições…" Icon="&#xE713;" Click="OnSettings"/>
+                <MenuItem Header="Atualizar agora" Icon="&#xE72C;" Click="OnHelloNow"/>
+                <MenuItem Header="Copiar diagnóstico" Icon="&#xE8C8;" Click="OnCopyDiagnostics"/>
+                <MenuItem x:Name="UpdateMenu" Header="Procurar versão nova" Icon="&#xE896;" Click="OnUpdate"/>
                 <Separator/>
-                <MenuItem Header="Esconder" Click="OnHide"/>
-                <MenuItem Header="Sair" Click="OnExit"/>
+                <MenuItem Header="Esconder" Icon="&#xED1A;" Click="OnHide"/>
+                <MenuItem Header="Sair" Icon="&#xE7E8;" Click="OnExit"/>
             </ContextMenu>
         </Border.ContextMenu>
         <Grid>

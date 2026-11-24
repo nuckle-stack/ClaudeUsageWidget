@@ -112,14 +112,45 @@ public class Updater
         catch (JsonException) { return null; }
     }
 
-    /// <summary>What is new, as plain text: the notes up to the install steps, which an update does by itself.</summary>
+    /// <summary>
+    /// What is new, in the notes' own Markdown (ReleaseNotes draws it): the
+    /// notes up to the install steps, which an update does by itself.
+    /// </summary>
     internal static string Notes(string body)
     {
         var cut = body.IndexOf("## Instalar", StringComparison.Ordinal);
-        var text = (cut >= 0 ? body[..cut] : body).Replace("\r", "");
-        text = Regex.Replace(text, @"^#+\s*", "", RegexOptions.Multiline);
-        text = text.Replace("**", "").Replace("`", "").Trim();
-        return text.Length > 700 ? text[..700].TrimEnd() + "…" : text;
+        return (cut >= 0 ? body[..cut] : body).Replace("\r", "").Trim();
+    }
+
+    /// <summary>
+    /// The releases after <paramref name="from"/> up to this one, newest
+    /// first: what changed in an update, even one that skipped versions.
+    /// </summary>
+    public static async Task<List<UpdateInfo>> ReleasesSinceAsync(Version from)
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{Repo}/releases?per_page=30");
+        request.Headers.Accept.ParseAdd("application/vnd.github+json");
+        using var response = await Http.SendAsync(request, cts.Token);
+        response.EnsureSuccessStatusCode();
+        return Since(await response.Content.ReadAsStringAsync(cts.Token), from, Current);
+    }
+
+    /// <summary>From GitHub's list of releases: those after <paramref name="from"/> up to <paramref name="to"/>, newest first.</summary>
+    internal static List<UpdateInfo> Since(string json, Version from, Version to)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return [];
+            return doc.RootElement.EnumerateArray()
+                .Select(r => Parse(r.GetRawText()))
+                .OfType<UpdateInfo>()
+                .Where(r => r.Version > from && r.Version <= to)
+                .OrderByDescending(r => r.Version)
+                .ToList();
+        }
+        catch (JsonException) { return []; }
     }
 
     /// <summary>Downloads the zip and unpacks it; returns the folder that holds its install.ps1.</summary>

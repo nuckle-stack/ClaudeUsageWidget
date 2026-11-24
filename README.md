@@ -92,7 +92,10 @@ Cobrem:
   acima, por isso o widget fica com o mais alto da mesma janela; e a
   repartição da semana que vem com ele (Claude Code, claude.ai, Cowork), que
   fica com o resumo dessa semana;
-- o ícone junto ao relógio: a percentagem cabe em 16 px, mesmo o "100";
+- o ícone junto ao relógio: a percentagem cabe em 16 px, mesmo o "100"; e pô-lo
+  na barra de tarefas ou no "^" (numa chave do registo dos testes, nunca na do
+  Windows), reconhecendo o caminho do widget com ou sem uma pasta conhecida à
+  frente;
 - o aviso de uma tarefa sem avançar: a hora da última linha da conversa, sem
   contar as que o Claude Code escreve numa sessão parada; o que fica de fora
   (subagentes, sessões sem transcript); e um aviso por paragem;
@@ -110,6 +113,11 @@ Cobrem:
 - a janela das definições: lê de volta o que recebeu, um valor errado leva ao
   separador dele, os separadores têm todos a mesma altura, e a linha da versão
   diz o que o GitHub tinha;
+- as notas das versões, lidas do Markdown delas (títulos, pontos, negrito; uma
+  parte por versão quando uma atualização salta versões), as janelas que as
+  mostram e as de desinstalar, os dois menus (o do widget e o do ícone junto
+  ao relógio) com o aspeto do widget, e o cartão que aparece com o rato por
+  cima do widget;
 - o aviso de que sobra muito da semana e a lista das semanas, com resets em
   dias e horas diferentes: cada conta tem o seu, e pode mudar de uma semana
   para a outra;
@@ -176,6 +184,7 @@ são ignorados.
 | Pasta / ficheiro | O que é |
 |---|---|
 | `*.cs`, `*.xaml` | O widget (WPF, .NET 10), com o instalador (`Installer.cs`, `InstallWindow`) |
+| `Theme.xaml` | O aspeto escuro do widget para os controlos, as dicas e o menu; cada janela junta-o às suas (o instalador fica com o do Windows) |
 | `feed\` | `ClaudeUsageFeed.exe`: o statusline e o hook de avisos do Claude Code |
 | `installer\` | `LEIA-ME.txt` e o `install.ps1` que passa a vez ao exe |
 | `tests\ClaudeUsageWidget.Tests\` | Testes xUnit do widget, do feed e do instalador |

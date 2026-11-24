@@ -4,6 +4,7 @@
     <!-- Same target as the widget, which is a WPF app. -->
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -27,4 +28,8 @@
     <Using Include="ClaudeUsageWidget" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
 </Project>

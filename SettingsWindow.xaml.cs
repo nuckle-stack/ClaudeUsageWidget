@@ -21,6 +21,8 @@ public partial class SettingsWindow : Window
     private static readonly Brush Underline = Frozen("#60A5FA");
 
     private readonly Config _original;
+    /// <summary>Where the tray icon was when the window opened: on the taskbar, in the "^", or unknown to Windows.</summary>
+    private readonly bool? _pinned;
     public Config Result { get; private set; }
 
     /// <param name="newer">A newer version found on GitHub, if any.</param>
@@ -58,6 +60,15 @@ public partial class SettingsWindow : Window
         Remind.Text = cfg.Alerts.RemindMinutes.ToString();
         StallMinutes.Text = cfg.Alerts.StallMinutes.ToString();
         TrayPercent.IsChecked = cfg.TrayPercent;
+        _pinned = Environment.ProcessPath is { } exe ? TrayPin.IsPinned(exe) : null;
+        TrayPinned.IsChecked = _pinned == true;
+        if (_pinned is null)
+        {
+            // Windows writes the icon's entry a few seconds after it first shows; Windows 10 has none.
+            TrayPinned.IsEnabled = false;
+            TrayPinned.Opacity = 0.4;
+            TrayPinned.ToolTip = "O Windows ainda não tem este ícone registado (fica uns segundos depois de o widget arrancar), ou esta versão do Windows não tem esta opção.";
+        }
         HotkeyBox.Text = cfg.Hotkey;
         Levels.Text = string.Join(", ", cfg.UsageAlerts.Levels);
         ForecastAlert.IsChecked = cfg.UsageAlerts.Forecast;
@@ -168,6 +179,8 @@ public partial class SettingsWindow : Window
     {
         if (!TryRead()) return;
         SetAutoStart(AutoStart.IsChecked == true);
+        if (_pinned is { } was && (TrayPinned.IsChecked == true) != was && Environment.ProcessPath is { } exe)
+            TrayPin.Pin(exe, !was);
         DialogResult = true;
     }
 
@@ -302,6 +315,7 @@ public partial class SettingsWindow : Window
             Hotkey = hotkey,
             CheckUpdates = CheckUpdates.IsChecked == true,
             ClearOfToasts = _original.ClearOfToasts,
+            TrayPinOffered = _original.TrayPinOffered,
         };
 
         return true;
@@ -312,9 +326,7 @@ public partial class SettingsWindow : Window
 
     private void OnUninstall(object sender, RoutedEventArgs e)
     {
-        if (MessageBox.Show(this,
-                "Remover o Claude Usage Widget?\n\nO statusline e o aviso do Claude Code voltam ao que eram antes, e o widget, as definições e o histórico dele são apagados.",
-                "Claude Usage Widget", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        if (!DialogWindow.Ask(Dialog.Uninstall, this)) return;
         UninstallRequested = true;
         DialogResult = false;
     }

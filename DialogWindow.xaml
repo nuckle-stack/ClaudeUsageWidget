@@ -1,0 +1,81 @@
+<Window x:Class="ClaudeUsageWidget.DialogWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Claude Usage"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" SizeToContent="Height" Width="420"
+        WindowStartupLocation="CenterScreen" Topmost="True"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        FontFamily="Segoe UI" FontSize="11" Foreground="#E6FFFFFF">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/ClaudeUsageWidget;component/Theme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <!-- A notice that asks: the card's look (a stripe in its colour), bigger, with buttons. -->
+    <Border CornerRadius="8" Background="#F815151A" BorderBrush="#30FFFFFF" BorderThickness="1" Padding="14,12,16,14">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Border x:Name="Stripe" CornerRadius="1.5" Margin="0,1"/>
+
+            <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                <Grid Background="Transparent" MouseLeftButtonDown="OnDrag">
+                    <TextBlock x:Name="Kind" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="CloseGlyph" Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="9"
+                               Padding="10,3,0,3" HorizontalAlignment="Right" VerticalAlignment="Center"
+                               Background="Transparent" ToolTip="Fechar" MouseLeftButtonUp="OnClose">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#80FFFFFF"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Foreground" Value="#F2FFFFFF"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+
+                <TextBlock x:Name="Heading" Foreground="#F2FFFFFF" FontSize="15" FontWeight="SemiBold"
+                           TextWrapping="Wrap" Margin="0,4,0,0"/>
+                <TextBlock x:Name="Body" Foreground="#B3FFFFFF" TextWrapping="Wrap" LineHeight="16" Margin="0,4,0,0"/>
+
+                <Border x:Name="NotesBox" Margin="0,12,0,0" CornerRadius="6" Background="#0DFFFFFF"
+                        BorderBrush="#14FFFFFF" BorderThickness="1" Visibility="Collapsed">
+                    <ScrollViewer x:Name="NotesScroll" MaxHeight="320" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled" Padding="12,10,8,10" Focusable="False">
+                        <StackPanel x:Name="Notes" Margin="0,0,6,0"/>
+                    </ScrollViewer>
+                </Border>
+
+                <Grid Margin="0,16,0,0">
+                    <TextBlock x:Name="Link" VerticalAlignment="Center" Cursor="Hand" Visibility="Collapsed"
+                               MouseLeftButtonUp="OnLink">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#99FFFFFF"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Foreground" Value="#60A5FA"/>
+                                        <Setter Property="TextDecorations" Value="Underline"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="No" IsCancel="True"/>
+                        <Button x:Name="Yes" Style="{StaticResource Primary}" Margin="8,0,0,0" IsDefault="True" Click="OnYes"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

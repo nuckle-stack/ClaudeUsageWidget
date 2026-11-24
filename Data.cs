@@ -220,6 +220,11 @@ public class Config
     public bool CheckUpdates { get; set; } = true;
     /// <summary>The widget was moved out of the notifications' corner (done once; it may be dragged back).</summary>
     public bool ClearOfToasts { get; set; }
+    /// <summary>
+    /// The tray icon was put on the taskbar, out of the "^" (done once; Windows' own
+    /// setting, or the widget's, decides after that).
+    /// </summary>
+    public bool TrayPinOffered { get; set; }
 }
 
 public class State

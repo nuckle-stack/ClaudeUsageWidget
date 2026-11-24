@@ -46,7 +46,7 @@ public class UpdaterTests
     [Fact]
     public void The_notes_stop_before_the_install_steps_and_lose_the_markdown()
     {
-        Assert.Equal("Novidades\n\n- Contexto ocupado em todas as sessões (45% ctx).", Updater.Parse(Release())!.Notes);
+        Assert.Equal("## Novidades\n\n- **Contexto ocupado** em todas as sessões (`45% ctx`).", Updater.Parse(Release())!.Notes);
     }
 
     [Fact]

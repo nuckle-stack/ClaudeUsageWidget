@@ -52,8 +52,10 @@ USAR
     mostram a versão instalada.
   - Também há um ícone junto ao relógio, com a % da janela de 5h na mesma cor
     do widget. Assim podes esconder o widget e continuar a ver o número (nas
-    Definições trocas o número por um simples ponto colorido). No início, o
-    Windows mete o ícone dentro do "^": arrasta-o de lá para a barra.
+    Definições trocas o número por um simples ponto colorido). O Windows põe
+    os ícones novos dentro do "^", mas o widget tira-o de lá e põe-no na barra
+    de tarefas, uma vez. Para o esconder outra vez no "^", desliga essa opção
+    nas Definições, separador Widget.
   - Depois de "Sair", volta a abri-lo no menu Iniciar: "Claude Usage Widget".
   - Avisos: aparecem por cima do widget, com o aspeto dele. A cor diz o tipo:
     verde (terminou), laranja (precisa de ti), amarelo (a ver), vermelho
@@ -117,9 +119,10 @@ USAR
     widget deixou de perceber o Claude Code"); clicar no aviso procura uma
     versão nova do widget.
   - Versões novas: o widget procura-as no GitHub de 6 em 6 horas e avisa uma
-    vez. Clica no aviso (ou botão direito > "Instalar a versão…") para a
-    instalar: o widget fecha-se e volta a abrir sozinho, com as tuas
-    definições. Desliga-se nas Definições.
+    vez. Clica no aviso (ou botão direito > "Instalar a versão…"): uma janela
+    mostra as novidades e pergunta se a instalas. O widget fecha-se e volta a
+    abrir sozinho, com as tuas definições. Depois, "Ver novidades" no aviso
+    mostra o que mudou desde a versão que tinhas. Desliga-se nas Definições.
   - "45% ctx", em cada sessão: quanto do contexto da sessão está ocupado. A
     partir de 80% fica cor de laranja e o widget avisa: é altura de /compact
     ou de uma sessão nova. Com "~" à frente é uma estimativa: nas sessões da

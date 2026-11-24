@@ -194,17 +194,20 @@ public partial class App : Application
     {
         var dir = Option(args, "--dir") ?? Installer.DefaultDir;
         var silent = args.Contains("--silent");
-        if (!silent && MessageBox.Show(
-                "Remover o Claude Usage Widget?\n\nO statusline e o aviso do Claude Code voltam ao que eram antes, e o widget, as definições e o histórico dele são apagados.",
-                "Claude Usage Widget", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (!silent && !DialogWindow.Ask(Dialog.Uninstall))
         {
             Shutdown();
             return;
         }
         var steps = new List<string>();
+        var failed = false;
         try { Installer.Uninstall(dir, steps.Add); }
-        catch (Exception ex) { steps.Add($"Não deu para remover tudo: {ex.Message}"); }
-        if (!silent) MessageBox.Show(string.Join("\n", steps), "Claude Usage Widget", MessageBoxButton.OK, MessageBoxImage.Information);
+        catch (Exception ex)
+        {
+            steps.Add($"Não deu para remover tudo: {ex.Message}");
+            failed = true;
+        }
+        if (!silent) DialogWindow.Ask(Dialog.Removed(steps, failed));
         Installer.RemoveFilesAfterExit(dir);
         Shutdown();
     }
